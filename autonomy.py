@@ -1471,3 +1471,10 @@ def stop_autonomy_runtime():
         pass
 
     return True
+
+def runtime_status():
+    return {
+        "running": bool(_runtime_thread and _runtime_thread.is_alive()),
+        "autonomy": os.getenv("GAIRUS_AUTONOMY", "false").lower() == "true",
+        "approvals": os.getenv("GAIRUS_APPROVALS", "true").lower() == "true",
+    }
