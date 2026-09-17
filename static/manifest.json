@@ -1,0 +1,9 @@
+{
+  "name": "Gaïrus",
+  "short_name": "Gaïrus",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05070b",
+  "theme_color": "#05070b",
+  "description": "Agent IA autonome Gaïrus"
+}

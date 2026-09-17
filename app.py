@@ -304,6 +304,23 @@ def index():
     return render_template("index.html")
 
 
+
+@app.route("/manifest.json")
+def manifest():
+    return send_from_directory("static", "manifest.json")
+
+@app.route("/sw.js")
+def service_worker():
+    return send_from_directory("static", "sw.js")
+
+@app.route("/icon-192.png")
+def icon_192():
+    return send_from_directory("static", "icon-192.png")
+
+@app.route("/icon-512.png")
+def icon_512():
+    return send_from_directory("static", "icon-512.png")
+
 @app.route("/health")
 def health():
     return jsonify({
