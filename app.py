@@ -366,7 +366,11 @@ def chat():
         return jsonify({"error": "message manquant"}), 400
 
     save_message("user", prompt)
-    result, brain = answer(prompt)
+    result = answer(prompt)
+    brain = result.get("brain")
+    provider = result.get("provider")
+    model = result.get("model")
+    result = result.get("reply")
     save_message("assistant", result)
 
     log_event("chat", json.dumps({"brain": brain}))
