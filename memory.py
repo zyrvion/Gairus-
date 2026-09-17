@@ -2,6 +2,7 @@
 GAÏRUS — Mémoire persistante (Section 13 / 14 / 40, version scaffold)
 Stocke : messages, actions d'outils, résultats.
 Ne stocke JAMAIS de mots de passe / tokens / clés (Section 13, 44).
+Les missions sont gérées séparément par missions.py (MissionManager).
 """
 import sqlite3
 import threading

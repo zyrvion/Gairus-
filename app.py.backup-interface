@@ -8,8 +8,7 @@ version terminal — c'est le MÊME Gaïrus, juste une autre façade.
 import json
 import struct
 import zlib
-from flask import Flask, request, jsonify, Response, render_template
-from flask_cors import CORS
+from flask import Flask, request, jsonify, Response
 
 import config
 import router
@@ -18,7 +17,6 @@ from memory import Memory
 from main import SYSTEM_PROMPT, try_parse_tool_call, check_permission
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
 mem = Memory()
 
 
@@ -221,7 +219,7 @@ form.addEventListener('submit', async (e) => {
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return Response(PAGE, mimetype="text/html")
 
 
 @app.route("/manifest.json")
