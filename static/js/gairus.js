@@ -1,749 +1,85 @@
-(() => {
-    "use strict";
-
-    const $ = (id) => document.getElementById(id);
-
-    const API = {
-        status: "/api/status",
-        chat: "/api/chat",
-        memory: "/api/memory",
-        missions: "/api/missions",
-        tasks: "/api/tasks",
-        actions: "/api/actions",
-        events: "/api/events",
-        approvals: "/api/approvals"
-    };
-
-    const state = {
-        isSending: false,
-        autonomy: false,
-        memory: true,
-        tools: true,
-        model: "auto",
-        provider: null,
-        modelUsed: null,
-        conversationId: null
-    };
-
-    const messages = $("messages");
-    const messageInput = $("messageInput");
-    const sendButton = $("sendButton");
-    const newChat = $("newChat");
-    const autonomyToggle = $("autonomyToggle");
-    const mobileMenu = $("mobileMenu");
-    const sidebar = $("sidebar");
-    const clearActivity = $("clearActivity");
-
-    function addActivity(title, details = "") {
-        const list = $("activityList");
-        if (!list) return;
-
-        const item = document.createElement("div");
-        item.className = "activity-item";
-
-        const strong = document.createElement("strong");
-        strong.textContent = title;
-
-        const span = document.createElement("span");
-        span.textContent = details;
-
-        item.appendChild(strong);
-        item.appendChild(span);
-        list.prepend(item);
-
-        while (list.children.length > 30) {
-            list.removeChild(list.lastChild);
-        }
-    }
-
-    function addMessage(text, role = "assistant", meta = "") {
-        if (!messages) return;
-
-        const wrapper = document.createElement("div");
-        wrapper.className = `message ${role}`;
-
-        const content = document.createElement("div");
-        content.className = "message-content";
-        content.textContent = text;
-
-        wrapper.appendChild(content);
-
-        if (meta) {
-            const metadata = document.createElement("small");
-            metadata.className = "message-meta";
-            metadata.textContent = meta;
-            wrapper.appendChild(metadata);
-        }
-
-        messages.appendChild(wrapper);
-        messages.scrollTop = messages.scrollHeight;
-    }
-
-    function getReply(data) {
-        if (!data) return "Le serveur n'a retourné aucune réponse.";
-
-        return (
-            data.reply ||
-            data.message ||
-            data.error ||
-            "Réponse vide."
-        );
-    }
-
-    async function apiFetch(url, options = {}) {
-        const response = await fetch(url, {
-            ...options,
-            headers: {
-                "Content-Type": "application/json",
-                ...(options.headers || {})
-            }
-        });
-
-        const text = await response.text();
-
-        let data = {};
-
-        try {
-            data = text ? JSON.parse(text) : {};
-        } catch {
-            data = { raw: text };
-        }
-
-        if (!response.ok) {
-            throw new Error(
-                data.error ||
-                data.message ||
-                data.raw ||
-                `Erreur HTTP ${response.status}`
-            );
-        }
-
-        return data;
-    }
-
-    function setSending(value) {
-        state.isSending = value;
-
-        if (sendButton) {
-            sendButton.disabled = value;
-            sendButton.style.opacity = value ? "0.6" : "1";
-        }
-
-        if (messageInput) {
-            messageInput.disabled = value;
-        }
-    }
-
-    function updateStatusUI(data = {}) {
-        const values = {
-            agentStatus: data.status || "online",
-            systemStatus: data.status || "online",
-            memoryStatus: "Active",
-            autonomyStatus: data.autonomy ? "Active" : "En attente",
-            providerStatus: state.provider || "Auto",
-            modelStatus: state.modelUsed || "Auto"
-        };
-
-        Object.entries(values).forEach(([id, value]) => {
-            const node = $(id);
-            if (node) node.textContent = value;
-        });
-    }
-
-    function buildRuntimePanel() {
-        if ($("gairusRuntimePanel")) return;
-
-        const panel = document.createElement("section");
-        panel.id = "gairusRuntimePanel";
-        panel.className = "gairus-runtime-panel";
-
-        panel.innerHTML = `
-            <div class="gairus-runtime-header">
-                <strong>État de Gaïrus</strong>
-                <span id="gairusRuntimeStatus">Connexion...</span>
-            </div>
-
-            <div class="gairus-runtime-grid">
-                <div>
-                    <small>Agent</small>
-                    <strong id="runtimeAgent">Gaïrus</strong>
-                </div>
-
-                <div>
-                    <small>Cerveau</small>
-                    <strong id="runtimeBrain">Orchestrator</strong>
-                </div>
-
-                <div>
-                    <small>Fournisseur</small>
-                    <strong id="runtimeProvider">Auto</strong>
-                </div>
-
-                <div>
-                    <small>Modèle</small>
-                    <strong id="runtimeModel">Auto</strong>
-                </div>
-
-                <div>
-                    <small>Missions</small>
-                    <strong id="runtimeMissions">0</strong>
-                </div>
-
-                <div>
-                    <small>Tâches</small>
-                    <strong id="runtimeTasks">0</strong>
-                </div>
-
-                <div>
-                    <small>Actions</small>
-                    <strong id="runtimeActions">0</strong>
-                </div>
-
-                <div>
-                    <small>Événements</small>
-                    <strong id="runtimeEvents">0</strong>
-                </div>
-            </div>
-        `;
-
-        const target =
-            document.querySelector(".messages")?.parentElement ||
-            document.querySelector("main") ||
-            document.body;
-
-        target.appendChild(panel);
-    }
-
-    function updateRuntimePanel(data = {}) {
-        const set = (id, value) => {
-            const node = $(id);
-            if (node) node.textContent = String(value ?? "");
-        };
-
-        set("gairusRuntimeStatus", data.status || "online");
-        set("runtimeAgent", data.agent || "Gaïrus");
-        set("runtimeBrain", data.brain || "orchestrator");
-        set(
-            "runtimeProvider",
-            data.provider || state.provider || "Auto"
-        );
-        set(
-            "runtimeModel",
-            data.model || state.modelUsed || "Auto"
-        );
-    }
-
-    async function loadStatus() {
-        try {
-            const data = await apiFetch(API.status);
-
-            state.autonomy = Boolean(data.autonomy);
-
-            if (autonomyToggle) {
-                autonomyToggle.checked = state.autonomy;
-            }
-
-            updateStatusUI(data);
-            updateRuntimePanel(data);
-
-            addActivity(
-                "Gaïrus en ligne",
-                `${data.status || "online"}`
-            );
-
-            return data;
-        } catch (error) {
-            addActivity(
-                "Statut indisponible",
-                error.message
-            );
-
-            return null;
-        }
-    }
-
-    async function sendMessage() {
-        if (state.isSending || !messageInput) return;
-
-        const text = messageInput.value.trim();
-        if (!text) return;
-
-        addMessage(text, "user");
-        messageInput.value = "";
-
-        setSending(true);
-
-        addActivity(
-            "Nouvelle demande",
-            text
-        );
-
-        try {
-            const data = await apiFetch(
-                API.chat,
-                {
-                    method: "POST",
-                    body: JSON.stringify({
-                        message: text,
-                        conversation_id: state.conversationId,
-                        memory: state.memory,
-                        tools: state.tools,
-                        model: state.model
-                    })
-                }
-            );
-
-            state.provider = data.provider || null;
-            state.modelUsed = data.model || null;
-
-            const meta = [
-                data.brain
-                    ? `cerveau: ${data.brain}`
-                    : "",
-                data.provider
-                    ? `fournisseur: ${data.provider}`
-                    : "",
-                data.model
-                    ? `modèle: ${data.model}`
-                    : ""
-            ]
-                .filter(Boolean)
-                .join(" · ");
-
-            addMessage(
-                getReply(data),
-                "assistant",
-                meta
-            );
-
-            addActivity(
-                "Réponse générée",
-                [
-                    data.brain || "orchestrator",
-                    data.provider || "auto",
-                    data.model || "auto"
-                ].join(" · ")
-            );
-
-            updateRuntimePanel(data);
-
-            await refreshAll();
-        } catch (error) {
-            addMessage(
-                `Erreur : ${error.message}`,
-                "assistant"
-            );
-
-            addActivity(
-                "Erreur",
-                error.message
-            );
-        } finally {
-            setSending(false);
-
-            if (messageInput) {
-                messageInput.focus();
-            }
-        }
-    }
-
-    function resetChat() {
-        if (!messages) return;
-
-        messages.innerHTML = "";
-
-        const welcome = document.createElement("div");
-        welcome.id = "welcome";
-        welcome.className = "welcome";
-
-        welcome.innerHTML = `
-            <h2>Gaïrus</h2>
-            <p>Prêt. Donne-moi une mission.</p>
-        `;
-
-        messages.appendChild(welcome);
-
-        state.conversationId = null;
-
-        addActivity(
-            "Nouvelle conversation",
-            "Conversation réinitialisée"
-        );
-    }
-
-    async function loadCollection(endpoint, label, renderer) {
-        try {
-            const data = await apiFetch(endpoint);
-
-            const items =
-                Array.isArray(data)
-                    ? data
-                    : (
-                        data.items ||
-                        data.data ||
-                        []
-                    );
-
-            renderer(items);
-
-            return items;
-        } catch (error) {
-            addActivity(
-                `${label} indisponible`,
-                error.message
-            );
-
-            renderer([]);
-
-            return [];
-        }
-    }
-
-    function renderSimpleList(id, items, emptyText, titleFields) {
-        const node = $(id);
-        if (!node) return;
-
-        node.innerHTML = "";
-
-        if (!items.length) {
-            node.innerHTML = `<span>${emptyText}</span>`;
-            return;
-        }
-
-        items.slice(0, 30).forEach(item => {
-            const el = document.createElement("div");
-            el.className = "gairus-list-item";
-
-            const title = document.createElement("strong");
-
-            let value = "";
-
-            for (const field of titleFields) {
-                if (item[field]) {
-                    value = item[field];
-                    break;
-                }
-            }
-
-            title.textContent =
-                value ||
-                `Élément #${item.id ?? ""}`;
-
-            const status = document.createElement("span");
-
-            status.textContent =
-                item.status ||
-                item.result ||
-                item.details ||
-                "";
-
-            el.appendChild(title);
-            el.appendChild(status);
-
-            node.appendChild(el);
-        });
-    }
-
-    function renderMissions(items) {
-        renderSimpleList(
-            "missionsList",
-            items,
-            "Aucune mission.",
-            ["title", "name", "description"]
-        );
-
-        const node = $("runtimeMissions");
-        if (node) node.textContent = items.length;
-    }
-
-    function renderTasks(items) {
-        renderSimpleList(
-            "tasksList",
-            items,
-            "Aucune tâche.",
-            ["title", "name", "description"]
-        );
-
-        const node = $("runtimeTasks");
-        if (node) node.textContent = items.length;
-    }
-
-    function renderActions(items) {
-        renderSimpleList(
-            "actionsList",
-            items,
-            "Aucune action.",
-            ["action", "name", "title"]
-        );
-
-        const node = $("runtimeActions");
-        if (node) node.textContent = items.length;
-    }
-
-    function renderEvents(items) {
-        renderSimpleList(
-            "eventsList",
-            items,
-            "Aucun événement.",
-            ["event", "type", "title"]
-        );
-
-        const node = $("runtimeEvents");
-        if (node) node.textContent = items.length;
-    }
-
-    function renderApprovals(items) {
-        renderSimpleList(
-            "approvalsList",
-            items,
-            "Aucune approbation en attente.",
-            ["action", "title", "name"]
-        );
-    }
-
-    async function refreshMemory() {
-        return loadCollection(
-            API.memory,
-            "Mémoire",
-            items => {
-                renderSimpleList(
-                    "memoryList",
-                    items,
-                    "Aucune mémoire.",
-                    ["content", "memory", "title", "name"]
-                );
-            }
-        );
-    }
-
-    async function refreshAll() {
-        await Promise.all([
-            loadCollection(
-                API.missions,
-                "Missions",
-                renderMissions
-            ),
-            loadCollection(
-                API.tasks,
-                "Tâches",
-                renderTasks
-            ),
-            loadCollection(
-                API.actions,
-                "Actions",
-                renderActions
-            ),
-            loadCollection(
-                API.events,
-                "Événements",
-                renderEvents
-            ),
-            loadCollection(
-                API.approvals,
-                "Approbations",
-                renderApprovals
-            )
-        ]);
-    }
-
-    async function saveMemory() {
-        const input =
-            $("memoryInput") ||
-            $("memoryText");
-
-        if (!input || !input.value.trim()) return;
-
-        try {
-            await apiFetch(
-                API.memory,
-                {
-                    method: "POST",
-                    body: JSON.stringify({
-                        content: input.value.trim()
-                    })
-                }
-            );
-
-            input.value = "";
-
-            addActivity(
-                "Mémoire enregistrée",
-                "Nouvelle mémoire ajoutée"
-            );
-
-            await refreshMemory();
-        } catch (error) {
-            addActivity(
-                "Erreur mémoire",
-                error.message
-            );
-        }
-    }
-
-    function bindEvents() {
-        if (sendButton) {
-            sendButton.addEventListener(
-                "click",
-                sendMessage
-            );
-        }
-
-        if (messageInput) {
-            messageInput.addEventListener(
-                "keydown",
-                event => {
-                    if (
-                        event.key === "Enter" &&
-                        !event.shiftKey
-                    ) {
-                        event.preventDefault();
-                        sendMessage();
-                    }
-                }
-            );
-        }
-
-        if (newChat) {
-            newChat.addEventListener(
-                "click",
-                resetChat
-            );
-        }
-
-        if (autonomyToggle) {
-            autonomyToggle.addEventListener(
-                "change",
-                () => {
-                    state.autonomy =
-                        autonomyToggle.checked;
-
-                    addActivity(
-                        "Autonomie",
-                        state.autonomy
-                            ? "Demandée"
-                            : "Désactivée"
-                    );
-                }
-            );
-        }
-
-        if (clearActivity) {
-            clearActivity.addEventListener(
-                "click",
-                () => {
-                    const list = $("activityList");
-                    if (list) list.innerHTML = "";
-                }
-            );
-        }
-
-        if (mobileMenu && sidebar) {
-            mobileMenu.addEventListener(
-                "click",
-                () => {
-                    sidebar.classList.toggle("open");
-                }
-            );
-        }
-
-        const memoryButton =
-            $("saveMemory") ||
-            $("memorySaveButton");
-
-        if (memoryButton) {
-            memoryButton.addEventListener(
-                "click",
-                saveMemory
-            );
-        }
-    }
-
-    function installRuntimeStyle() {
-        if ($("gairusRuntimeStyle")) return;
-
-        const style = document.createElement("style");
-        style.id = "gairusRuntimeStyle";
-
-        style.textContent = `
-            .gairus-runtime-panel {
-                margin: 16px;
-                padding: 16px;
-                border-radius: 16px;
-                background: rgba(255,255,255,.04);
-                border: 1px solid rgba(255,255,255,.08);
-            }
-
-            .gairus-runtime-header {
-                display: flex;
-                justify-content: space-between;
-                gap: 12px;
-                margin-bottom: 14px;
-            }
-
-            .gairus-runtime-grid {
-                display: grid;
-                grid-template-columns:
-                    repeat(auto-fit,minmax(120px,1fr));
-                gap: 10px;
-            }
-
-            .gairus-runtime-grid > div {
-                padding: 10px;
-                border-radius: 12px;
-                background: rgba(255,255,255,.03);
-            }
-
-            .gairus-runtime-grid small,
-            .gairus-runtime-grid strong {
-                display: block;
-            }
-
-            .gairus-runtime-grid small {
-                opacity: .6;
-                margin-bottom: 4px;
-            }
-
-            .gairus-runtime-grid strong {
-                overflow-wrap: anywhere;
-            }
-
-            .gairus-list-item {
-                display: flex;
-                justify-content: space-between;
-                gap: 12px;
-                padding: 8px 0;
-            }
-
-            .gairus-list-item span {
-                opacity: .65;
-                text-align: right;
-            }
-        `;
-
-        document.head.appendChild(style);
-    }
-
-    async function init() {
-        installRuntimeStyle();
-        buildRuntimePanel();
-        bindEvents();
-
-        await loadStatus();
-        await refreshMemory();
-        await refreshAll();
-
-        addActivity(
-            "Interface prête",
-            "Gaïrus est connecté au backend"
-        );
-    }
-
-    if (document.readyState === "loading") {
-        document.addEventListener(
-            "DOMContentLoaded",
-            init
-        );
-    } else {
-        init();
-    }
-})();
+const A="/api";
+const state={page:location.hash.slice(1)||"chat",data:{status:{},missions:[],tasks:[],actions:[],approvals:[],events:[],memory:[]}};
+const nav=[
+["chat","⌕","Gaïrus"],
+["missions","◈","Missions"],
+["tasks","✓","Tâches"],
+["actions","⚙","Actions"],
+["approvals","!","Approbations"],
+["memory","▣","Mémoire"],
+["tools","◉","Outils"],
+["events","◷","Activité"],
+["health","●","Système"],
+["settings","⚙","Paramètres"]
+];
+const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function api(path,opt={}){const r=await fetch(A+path,{headers:{"Content-Type":"application/json"},...opt});const t=await r.text();let d={};try{d=t?JSON.parse(t):{}}catch{d={raw:t}}if(!r.ok)throw new Error(d.error||d.message||t||r.statusText);return d}
+function arr(x){if(Array.isArray(x))return x;if(Array.isArray(x?.items))return x.items;if(Array.isArray(x?.data))return x.data;if(Array.isArray(x?.missions))return x.missions;if(Array.isArray(x?.tasks))return x.tasks;if(Array.isArray(x?.actions))return x.actions;if(Array.isArray(x?.approvals))return x.approvals;if(Array.isArray(x?.events))return x.events;if(Array.isArray(x?.memory))return x.memory;return[]}
+function id(x){return x.mission_id||x.task_id||x.action_id||x.approval_id||x.id}
+function badge(s){let c=s==="completed"?"ok":s==="waiting_approval"?"wait":"";return `<span class="badge ${c}">${esc(s||"pending")}</span>`}
+async function load(){
+ try{
+  const [status,missions,tasks,actions,approvals,events,memory]=await Promise.all([
+   api("/status"),api("/autonomy/missions").catch(()=>api("/missions")),api("/autonomy/tasks").catch(()=>api("/tasks")),
+   api("/autonomy/actions").catch(()=>api("/actions")),api("/autonomy/approvals").catch(()=>api("/approvals")),
+   api("/autonomy/events").catch(()=>api("/events")),api("/memory")
+  ]);
+  state.data={status,missions:arr(missions),tasks:arr(tasks),actions:arr(actions),approvals:arr(approvals),events:arr(events),memory:arr(memory)};
+ }catch(e){state.data.error=e.message}
+ render()
+}
+function shell(body){
+ document.querySelector("#app").innerHTML=`<div class="app"><aside class="side" id="side">
+ <div class="brand"><div class="brandMark">G</div>Gaïrus</div>
+ <button class="new" onclick="newMission()">＋ Nouvelle mission</button>
+ <div class="nav">${nav.map(n=>`<button class="${state.page===n[0]?"active":""}" onclick="go('${n[0]}')"><span class="ico">${n[1]}</span>${n[2]}</button>`).join("")}</div>
+ <div class="sideBottom"><button class="new" onclick="go('settings')">⚙ Paramètres</button></div>
+ </aside>
+ <main class="main"><header class="top"><button class="menu" onclick="document.querySelector('#side').classList.toggle('open')">☰</button><div class="topTitle">${title()}</div><div class="online"><i></i> Gaïrus actif</div></header><div class="page">${body}</div></main></div>`
+}
+function title(){return (nav.find(x=>x[0]===state.page)||nav[0])[2]}
+function go(p){state.page=p;location.hash=p;render()}
+function render(){
+ if(state.page==="chat")return chat();
+ const fn={missions:missions,tasks:tasks,actions:actions,approvals:approvals,memory:memory,tools:tools,events:events,health:health,settings:settings}[state.page];
+ shell(`<section class="section">${fn()}</section>`)
+}
+function chat(){
+ shell(`<div class="messages" id="messages"><div class="welcome"><div class="logo">G</div><h1>Bonjour, je suis Gaïrus.</h1><div class="subtitle">Votre employé IA. Dites-moi ce que vous voulez accomplir.</div><div class="composer"><textarea id="first" placeholder="Que voulez-vous que Gaïrus fasse ?"></textarea><div class="composeBottom"><button class="send" onclick="send('first')">Envoyer</button></div></div></div></div>`)
+}
+async function send(input){
+ const el=document.getElementById(input),text=el.value.trim();if(!text)return;
+ const box=document.getElementById("messages");box.innerHTML+=`<div class="msg user"><div class="bubble">${esc(text)}</div></div>`;
+ el.value="";box.innerHTML+=`<div class="msg"><div class="who">G</div><div class="bubble">Je travaille dessus…</div></div>`;
+ box.scrollTop=box.scrollHeight;
+ try{
+  const r=await api("/chat",{method:"POST",body:JSON.stringify({message:text})});
+  box.lastElementChild.querySelector(".bubble").textContent=r.reply||r.response||r.message||"Terminé.";
+ }catch(e){box.lastElementChild.querySelector(".bubble").textContent="Erreur : "+e.message}
+}
+function head(h,s){return `<div class="sectionHead"><h2>${h}</h2><span>${s||""}</span></div>`}
+function missions(){
+ let a=state.data.missions;
+ return head("Missions","Travaux confiés à Gaïrus")+`<div class="actions"><button class="btn dark" onclick="newMission()">＋ Nouvelle mission</button></div><div class="list">${a.length?a.map(m=>`<div class="item"><div class="itemTop"><div><div class="itemTitle">${esc(m.title||m.objective)}</div><div class="meta">${esc(m.objective||"")} · ${esc(id(m))}</div></div>${badge(m.status)}</div><div class="actions"><button class="btn" onclick="plan('${esc(m.mission_id)}')">Planifier</button><button class="btn dark" onclick="run('${esc(m.mission_id)}')">Exécuter</button></div></div>`).join(""):`<div class="empty">Aucune mission</div>`}</div>`
+}
+function tasks(){return head("Tâches","Décomposition du travail")+list(state.data.tasks,x=>`<div class="itemTop"><div><div class="itemTitle">${esc(x.title)}</div><div class="meta">Priorité ${esc(x.priority)} · ${esc(x.task_id)}</div></div>${badge(x.status)}</div>`)}
+function actions(){return head("Actions","Actions exécutées par Gaïrus")+list(state.data.actions,x=>`<div class="itemTop"><div><div class="itemTitle">${esc(x.tool)}</div><div class="meta">${esc(x.action_id)}</div></div>${badge(x.status)}</div>`)}
+function approvals(){return head("Approbations","Actions nécessitant votre autorisation")+list(state.data.approvals,x=>`<div><div class="itemTop"><div><div class="itemTitle">${esc(x.reason||"Autorisation requise")}</div><div class="meta">${esc(x.approval_id)}</div></div>${badge(x.status)}</div>${x.status==="pending"?`<div class="actions"><button class="btn dark" onclick="approve('${esc(x.approval_id)}')">Autoriser</button><button class="btn red" onclick="reject('${esc(x.approval_id)}')">Refuser</button></div>`:""}</div>`)}
+function memory(){return head("Mémoire","Ce que Gaïrus conserve")+`<div class="form"><textarea id="mem" placeholder="Information à mémoriser"></textarea><button class="btn dark" onclick="saveMemory()">Enregistrer</button></div><br>${list(state.data.memory,x=>`<div class="item">${esc(x.content||x.memory||x.value||JSON.stringify(x))}</div>`)}`}
+function tools(){return head("Outils","Capacités disponibles")+`<div class="grid">${["noop","system_status","memory_read","memory_write","http_get"].map(x=>`<div class="card"><h3>${x}</h3><p>Outil Gaïrus disponible dans le moteur d'exécution.</p></div>`).join("")}</div>`}
+function events(){return head("Activité","Journal réel du moteur")+list(state.data.events,x=>`<div class="item"><div class="itemTitle">${esc(x.message||x.event_type)}</div><div class="meta">${esc(x.event_type||"")} · ${esc(x.created_at||"")}</div></div>`)}
+function health(){let s=state.data.status||{};return head("Système","État du backend")+`<div class="grid"><div class="card"><div class="kpi">●</div><h3>Backend</h3><p>Connecté</p></div><div class="card"><div class="kpi">${esc(s.provider||s.brain||"auto")}</div><h3>Moteur IA</h3><p>Fournisseur actif</p></div><div class="card"><div class="kpi">${state.data.missions.length}</div><h3>Missions</h3><p>Enregistrées</p></div></div>`}
+function settings(){return head("Paramètres","Configuration de Gaïrus")+`<div class="card"><h3>Runtime</h3><p>Le moteur utilise la configuration du serveur Render. Les clés et paramètres sensibles restent côté serveur.</p></div>`}
+function list(a,f){return `<div class="list">${a.length?a.map(f).join(""):`<div class="empty">Aucun élément</div>`}</div>`}
+async function newMission(){
+ const objective=prompt("Objectif de la mission");if(!objective)return;
+ try{await api("/autonomy/mission",{method:"POST",body:JSON.stringify({objective,title:objective})});await load();go("missions")}catch(e){alert(e.message)}
+}
+async function plan(i){try{await api(`/autonomy/mission/${i}/plan`,{method:"POST"});await load()}catch(e){alert(e.message)}}
+async function run(i){try{await api(`/autonomy/mission/${i}/run`,{method:"POST"});await load()}catch(e){alert(e.message)}}
+async function approve(i){try{await api(`/autonomy/approval/${i}/approve`,{method:"POST"});await load()}catch(e){alert(e.message)}}
+async function reject(i){try{await api(`/autonomy/approval/${i}/reject`,{method:"POST"});await load()}catch(e){alert(e.message)}}
+async function saveMemory(){let x=document.getElementById("mem").value.trim();if(!x)return;try{await api("/memory",{method:"POST",body:JSON.stringify({content:x,memory:x})});document.getElementById("mem").value="";await load()}catch(e){alert(e.message)}}
+window.addEventListener("hashchange",()=>{state.page=location.hash.slice(1)||"chat";load()});
+load();
+setInterval(load,10000);
