@@ -1478,3 +1478,111 @@ def runtime_status():
         "autonomy": os.getenv("GAIRUS_AUTONOMY", "false").lower() == "true",
         "approvals": os.getenv("GAIRUS_APPROVALS", "true").lower() == "true",
     }
+
+# ============================================================
+# COMPATIBILITE API GAÏRUS
+# ============================================================
+
+def ai_plan_mission(prompt):
+    """Construit un plan de mission à partir de l'objectif."""
+    result = ask_with_fallback(
+        prompt,
+        system=(
+            "Tu es le planificateur autonome de Gaïrus. "
+            "Transforme l'objectif en tâches concrètes. "
+            "Réponds uniquement avec un JSON valide au format: "
+            '{"tasks":[{"title":"...","description":"...",'
+            '"priority":1,"tool":"none","requires_approval":false,'
+            '"parameters":{}}]}'
+        ),
+    )
+    return result
+
+
+def autonomous_plan_mission(mission_id):
+    """Planifie une mission existante."""
+    with db() as conn:
+        row = conn.execute(
+            "SELECT * FROM autonomy_missions WHERE mission_id=?",
+            (mission_id,),
+        ).fetchone()
+
+    if not row:
+        raise ValueError("Mission introuvable")
+
+    objective = row["objective"]
+    result = ai_plan_mission(objective)
+
+    reply = result.get("reply", "") if isinstance(result, dict) else str(result)
+
+    import json
+    import re
+
+    try:
+        match = re.search(r"\{.*\}", reply, re.S)
+        plan = json.loads(match.group(0) if match else reply)
+    except Exception:
+        plan = {
+            "tasks": [{
+                "title": "Exécuter l'objectif",
+                "description": objective,
+                "priority": 1,
+                "tool": "none",
+                "requires_approval": False,
+                "parameters": {},
+            }]
+        }
+
+    tasks = plan.get("tasks", [])
+
+    for item in tasks:
+        create_task(
+            mission_id=mission_id,
+            title=str(item.get("title", "Tâche")),
+            description=str(item.get("description", "")),
+            priority=int(item.get("priority", 5)),
+            depends_on=item.get("depends_on"),
+        )
+
+    with db() as conn:
+        conn.execute(
+            "UPDATE autonomy_missions SET status=?, plan=?, updated_at=? "
+            "WHERE mission_id=?",
+            ("planned", json.dumps(plan, ensure_ascii=False), now(), mission_id),
+        )
+        conn.commit()
+
+    event(
+        mission_id,
+        None,
+        None,
+        "mission_planned",
+        "Plan autonome créé",
+        plan,
+    )
+
+    return plan
+
+
+def create_autonomous_mission(objective):
+    """Crée puis planifie une mission autonome."""
+    objective = str(objective or "").strip()
+
+    if not objective:
+        raise ValueError("Objectif de mission vide")
+
+    mission_id = create_mission(
+        title=objective[:120],
+        objective=objective,
+    )
+
+    autonomous_plan_mission(mission_id)
+
+    return mission_id
+
+
+def autonomous_mission_cycle(mission_id):
+    """Exécute un cycle autonome pour une mission."""
+    return run_cycle()
+
+
