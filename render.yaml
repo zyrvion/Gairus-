@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: gairus
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 180
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: GAIRUS_NAME
+        value: Gaïrus
+      - key: GAIRUS_AUTONOMY
+        value: "false"
+      - key: GAIRUS_APPROVALS
+        value: "true"

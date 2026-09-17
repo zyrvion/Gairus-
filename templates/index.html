@@ -1,479 +1,79 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Gaïrus</title>
-
-    <meta name="theme-color" content="#070b12">
-    <meta name="description" content="Gaïrus, agent IA autonome">
-
-    <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/static/css/gairus.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gaïrus</title>
+<link rel="stylesheet" href="/static/gairus.css">
 </head>
-
 <body>
-
 <div class="app">
-
-    <!-- SIDEBAR -->
-    <aside class="sidebar" id="sidebar">
-
-        <div class="brand">
-            <div class="brand-orb">
-                <span></span>
-            </div>
-
-            <div class="brand-text">
-                <strong>GAÏRUS</strong>
-                <small>AI OPERATING AGENT</small>
-            </div>
-        </div>
-
-        <button class="new-chat" id="newChat">
-            <span>＋</span>
-            Nouvelle conversation
-        </button>
-
-        <nav class="navigation">
-
-            <div class="nav-section">
-                <span class="nav-label">ESPACE</span>
-
-                <button class="nav-item active" data-view="chat">
-                    <span class="nav-icon">◉</span>
-                    <span>Chat</span>
-                </button>
-
-                <button class="nav-item" data-view="missions">
-                    <span class="nav-icon">◇</span>
-                    <span>Missions</span>
-                </button>
-
-                <button class="nav-item" data-view="projects">
-                    <span class="nav-icon">▣</span>
-                    <span>Projets</span>
-                </button>
-
-                <button class="nav-item" data-view="tasks">
-                    <span class="nav-icon">✓</span>
-                    <span>Tâches</span>
-                </button>
-            </div>
-
-            <div class="nav-section">
-                <span class="nav-label">CONNAISSANCE</span>
-
-                <button class="nav-item" data-view="memory">
-                    <span class="nav-icon">◈</span>
-                    <span>Mémoire</span>
-                </button>
-
-                <button class="nav-item" data-view="files">
-                    <span class="nav-icon">□</span>
-                    <span>Fichiers</span>
-                </button>
-            </div>
-
-            <div class="nav-section">
-                <span class="nav-label">SYSTÈME</span>
-
-                <button class="nav-item" data-view="tools">
-                    <span class="nav-icon">⚙</span>
-                    <span>Outils</span>
-                </button>
-
-                <button class="nav-item" data-view="models">
-                    <span class="nav-icon">◇</span>
-                    <span>Modèles IA</span>
-                </button>
-
-                <button class="nav-item" data-view="activity">
-                    <span class="nav-icon">⌁</span>
-                    <span>Activité</span>
-                </button>
-
-                <button class="nav-item" data-view="settings">
-                    <span class="nav-icon">⚙</span>
-                    <span>Paramètres</span>
-                </button>
-            </div>
-
-        </nav>
-
-        <div class="sidebar-footer">
-
-            <div class="system-status">
-                <span class="status-dot"></span>
-
-                <div>
-                    <strong>Gaïrus actif</strong>
-                    <small>Système opérationnel</small>
-                </div>
-            </div>
-
-            <div class="user-mini">
-                <div class="user-avatar">C</div>
-
-                <div>
-                    <strong>Chief</strong>
-                    <small>Administrateur</small>
-                </div>
-
-                <button aria-label="Menu">⋮</button>
-            </div>
-
-        </div>
-
-    </aside>
-
-
-    <!-- MAIN -->
-    <main class="main">
-
-        <!-- TOPBAR -->
-        <header class="topbar">
-
-            <button class="mobile-menu" id="mobileMenu">
-                ☰
-            </button>
-
-            <div class="page-title">
-                <span class="eyebrow">ESPACE DE TRAVAIL</span>
-                <h1>Conversation</h1>
-            </div>
-
-            <div class="topbar-actions">
-
-                <div class="connection">
-                    <span class="status-dot"></span>
-                    <span>En ligne</span>
-                </div>
-
-                <button class="icon-button" title="Notifications">
-                    ♢
-                </button>
-
-                <button class="icon-button" title="Paramètres">
-                    ⚙
-                </button>
-
-            </div>
-
-        </header>
-
-
-        <!-- CHAT -->
-        <section class="chat-area">
-
-            <div class="welcome" id="welcome">
-
-                <div class="hero-orb">
-                    <div class="orb-core"></div>
-                    <div class="orb-ring ring-one"></div>
-                    <div class="orb-ring ring-two"></div>
-                </div>
-
-                <span class="welcome-label">
-                    GAÏRUS ONLINE
-                </span>
-
-                <h2>
-                    Bonjour, Chief.
-                </h2>
-
-                <p>
-                    Je suis Gaïrus, ton agent IA.
-                    Que veux-tu accomplir aujourd'hui ?
-                </p>
-
-                <div class="quick-actions">
-
-                    <button data-prompt="Analyse mon projet Gaïrus et propose les prochaines étapes.">
-                        <span>⌁</span>
-                        Analyser mon projet
-                    </button>
-
-                    <button data-prompt="Aide-moi à développer une nouvelle fonctionnalité.">
-                        <span>＋</span>
-                        Développer
-                    </button>
-
-                    <button data-prompt="Fais une recherche et donne-moi une synthèse claire.">
-                        <span>⌕</span>
-                        Rechercher
-                    </button>
-
-                    <button data-prompt="Montre-moi l'état actuel de mes systèmes.">
-                        <span>◉</span>
-                        État du système
-                    </button>
-
-                </div>
-
-            </div>
-
-
-            <div class="messages" id="messages"></div>
-
-        </section>
-
-
-        <!-- COMPOSER -->
-        <div class="composer-container">
-
-            <div class="composer">
-
-                <div class="composer-actions">
-
-                    <button id="attachButton" title="Fichier">
-                        ＋
-                    </button>
-
-                    <button id="cameraButton" title="Caméra">
-                        ◉
-                    </button>
-
-                    <button id="micButton" title="Microphone">
-                        ♫
-                    </button>
-
-                </div>
-
-                <textarea
-                    id="messageInput"
-                    rows="1"
-                    placeholder="Écris à Gaïrus..."
-                    autocomplete="off"
-                ></textarea>
-
-                <button
-                    class="send-button"
-                    id="sendButton"
-                    title="Envoyer"
-                >
-                    ↑
-                </button>
-
-            </div>
-
-            <div class="composer-footer">
-
-                <span>
-                    Gaïrus peut utiliser ses outils selon les autorisations configurées.
-                </span>
-
-                <span>
-                    <kbd>Entrée</kbd> envoyer
-                    <kbd>Shift</kbd> + <kbd>Entrée</kbd> nouvelle ligne
-                </span>
-
-            </div>
-
-        </div>
-
-    </main>
-
-
-    <!-- RIGHT PANEL -->
-    <aside class="right-panel">
-
-        <div class="panel-header">
-
-            <div>
-                <span class="eyebrow">AGENT</span>
-                <strong>Gaïrus</strong>
-            </div>
-
-            <button id="closePanel">
-                ×
-            </button>
-
-        </div>
-
-
-        <!-- AGENT CARD -->
-        <section class="agent-card">
-
-            <div class="agent-card-top">
-
-                <div class="agent-avatar">
-                    <div></div>
-                </div>
-
-                <div>
-                    <strong>Gaïrus Core</strong>
-                    <span>
-                        Autonomous AI Agent
-                    </span>
-                </div>
-
-                <span class="live-badge">
-                    LIVE
-                </span>
-
-            </div>
-
-            <div class="agent-stats">
-
-                <div>
-                    <strong id="modelStatus">Qwen</strong>
-                    <span>Modèle</span>
-                </div>
-
-                <div>
-                    <strong id="memoryStatus">Active</strong>
-                    <span>Mémoire</span>
-                </div>
-
-                <div>
-                    <strong id="toolStatus">Ready</strong>
-                    <span>Outils</span>
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- OBJECTIVE -->
-        <section class="panel-section">
-
-            <div class="section-heading">
-                <span>OBJECTIF ACTUEL</span>
-                <button>•••</button>
-            </div>
-
-            <div class="objective-card">
-
-                <div class="objective-icon">
-                    ◇
-                </div>
-
-                <div>
-                    <strong id="objectiveTitle">
-                        En attente d'une mission
-                    </strong>
-
-                    <p id="objectiveDescription">
-                        Gaïrus est prêt à recevoir ton prochain objectif.
-                    </p>
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- ACTIVITY -->
-        <section class="panel-section">
-
-            <div class="section-heading">
-                <span>ACTIVITÉ</span>
-                <button id="clearActivity">Effacer</button>
-            </div>
-
-            <div class="activity-list" id="activityList">
-
-                <div class="activity-item">
-                    <span class="activity-icon">●</span>
-
-                    <div>
-                        <strong>Système prêt</strong>
-                        <small>Maintenant</small>
-                    </div>
-                </div>
-
-                <div class="activity-item">
-                    <span class="activity-icon">◇</span>
-
-                    <div>
-                        <strong>Mémoire chargée</strong>
-                        <small>Session actuelle</small>
-                    </div>
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- MODEL -->
-        <section class="panel-section">
-
-            <div class="section-heading">
-                <span>MODÈLE</span>
-            </div>
-
-            <select id="modelSelect">
-
-                <option value="auto">
-                    Auto
-                </option>
-
-                <option value="qwen">
-                    Qwen local
-                </option>
-
-                <option value="remote">
-                    Modèle distant
-                </option>
-
-            </select>
-
-        </section>
-
-
-        <!-- CAPABILITIES -->
-        <section class="panel-section">
-
-            <div class="section-heading">
-                <span>CAPACITÉS</span>
-            </div>
-
-            <label class="toggle-row">
-                <span>
-                    <strong>Mémoire</strong>
-                    <small>Conserver le contexte</small>
-                </span>
-
-                <input type="checkbox" checked id="memoryToggle">
-                <i></i>
-            </label>
-
-            <label class="toggle-row">
-                <span>
-                    <strong>Outils</strong>
-                    <small>Autoriser les outils</small>
-                </span>
-
-                <input type="checkbox" checked id="toolsToggle">
-                <i></i>
-            </label>
-
-            <label class="toggle-row">
-                <span>
-                    <strong>Autonomie</strong>
-                    <small>Exécution contrôlée</small>
-                </span>
-
-                <input type="checkbox" id="autonomyToggle">
-                <i></i>
-            </label>
-
-        </section>
-
-    </aside>
-
+  <div class="top">
+    <div class="brand">◈ Gaïrus</div>
+    <div class="status" id="status">● connexion...</div>
+  </div>
+
+  <div class="panel">
+    <div id="chat" class="chat"></div>
+
+    <form id="form" class="input">
+      <input id="message" autocomplete="off"
+             placeholder="Donne une mission à Gaïrus...">
+      <button>Envoyer</button>
+    </form>
+  </div>
 </div>
 
+<script>
+const chat=document.getElementById("chat");
+const form=document.getElementById("form");
+const input=document.getElementById("message");
+const status=document.getElementById("status");
 
-<!-- MOBILE OVERLAY -->
-<div class="overlay" id="overlay"></div>
+function add(role,text){
+  const d=document.createElement("div");
+  d.className="msg "+role;
+  d.textContent=text;
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
+}
 
+async function check(){
+  try{
+    const r=await fetch("/health");
+    const d=await r.json();
+    status.textContent="● "+d.agent+" en ligne";
+  }catch(e){
+    status.textContent="● hors ligne";
+  }
+}
 
-<script src="/static/js/gairus.js"></script>
+form.addEventListener("submit",async e=>{
+  e.preventDefault();
+  const text=input.value.trim();
+  if(!text)return;
 
+  add("user",text);
+  input.value="";
+  add("assistant","Gaïrus réfléchit...");
+
+  const placeholder=chat.lastChild;
+
+  try{
+    const r=await fetch("/api/chat",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({message:text})
+    });
+
+    const d=await r.json();
+    placeholder.textContent=d.reply||d.error||"Erreur";
+  }catch(err){
+    placeholder.textContent="Erreur de connexion à Gaïrus.";
+  }
+});
+
+check();
+</script>
 </body>
 </html>
