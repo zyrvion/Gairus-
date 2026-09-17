@@ -10,7 +10,7 @@ from pathlib import Path
 import requests
 from providers import ask_with_fallback
 
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 
