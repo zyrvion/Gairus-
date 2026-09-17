@@ -1,4 +1,4 @@
-const GAIRUS_API = "https://gairus.onrender.com/api/chat";
+const GAIRUS_API = "/api/chat";
 
 const state = {
     isSending: false,
@@ -116,7 +116,7 @@ async function sendMessage() {
     addActivity("Message envoyé", "Connexion au backend Gaïrus");
 
     try {
-        const response = await fetch(`${GAIRUS_API}/api/chat`, {
+        const response = await fetch(GAIRUS_API, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
