@@ -10,6 +10,16 @@ from pathlib import Path
 import requests
 from providers import ask_with_fallback
 
+from autonomy import (
+    init_autonomy,
+    create_mission,
+    create_task,
+    create_action,
+    list_rows,
+    approve,
+    reject,
+    run_cycle,
+)
 from flask import Flask, jsonify, request, render_template, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -537,9 +547,245 @@ if AUTONOMY:
     threading.Thread(target=autonomy_loop, daemon=True).start()
 
 
+
+# ============================================================
+# GAÏRUS AUTONOMY ENGINE
+# ============================================================
+
+@app.route("/api/autonomy/mission", methods=["POST"])
+def autonomy_create_mission():
+    data = request.get_json(silent=True) or {}
+
+    title = str(data.get("title") or "Mission Gaïrus").strip()
+    objective = str(data.get("objective") or "").strip()
+
+    if not objective:
+        return jsonify({
+            "ok": False,
+            "error": "objective requis"
+        }), 400
+
+    mission_id = create_mission(title, objective)
+
+    return jsonify({
+        "ok": True,
+        "mission_id": mission_id,
+        "status": "planning"
+    }), 201
+
+
+@app.route("/api/autonomy/task", methods=["POST"])
+def autonomy_create_task():
+    data = request.get_json(silent=True) or {}
+
+    mission_id = str(data.get("mission_id") or "").strip()
+    title = str(data.get("title") or "").strip()
+
+    if not mission_id or not title:
+        return jsonify({
+            "ok": False,
+            "error": "mission_id et title requis"
+        }), 400
+
+    task_id = create_task(
+        mission_id=mission_id,
+        title=title,
+        description=str(data.get("description") or ""),
+        priority=int(data.get("priority") or 5),
+        depends_on=data.get("depends_on") or [],
+    )
+
+    return jsonify({
+        "ok": True,
+        "task_id": task_id,
+        "status": "pending"
+    }), 201
+
+
+@app.route("/api/autonomy/action", methods=["POST"])
+def autonomy_create_action():
+    data = request.get_json(silent=True) or {}
+
+    task_id = str(data.get("task_id") or "").strip()
+    tool = str(data.get("tool") or "").strip()
+
+    if not task_id or not tool:
+        return jsonify({
+            "ok": False,
+            "error": "task_id et tool requis"
+        }), 400
+
+    action_id = create_action(
+        task_id=task_id,
+        tool=tool,
+        parameters=data.get("parameters") or {},
+        requires_approval=bool(
+            data.get("requires_approval", False)
+        ),
+    )
+
+    return jsonify({
+        "ok": True,
+        "action_id": action_id
+    }), 201
+
+
+@app.route("/api/autonomy/missions", methods=["GET"])
+def autonomy_missions():
+    return jsonify(list_rows("autonomy_missions"))
+
+
+@app.route("/api/autonomy/tasks", methods=["GET"])
+def autonomy_tasks():
+    return jsonify(list_rows("autonomy_tasks"))
+
+
+@app.route("/api/autonomy/actions", methods=["GET"])
+def autonomy_actions():
+    return jsonify(list_rows("autonomy_actions"))
+
+
+@app.route("/api/autonomy/approvals", methods=["GET"])
+def autonomy_approvals():
+    return jsonify(list_rows("autonomy_approvals"))
+
+
+@app.route("/api/autonomy/events", methods=["GET"])
+def autonomy_events():
+    return jsonify(list_rows("autonomy_events"))
+
+
+@app.route("/api/autonomy/approval/<approval_id>/approve",
+           methods=["POST"])
+def autonomy_approve(approval_id):
+    if not approve(approval_id):
+        return jsonify({
+            "ok": False,
+            "error": "Approbation introuvable"
+        }), 404
+
+    return jsonify({
+        "ok": True,
+        "status": "approved"
+    })
+
+
+@app.route("/api/autonomy/approval/<approval_id>/reject",
+           methods=["POST"])
+def autonomy_reject(approval_id):
+    if not reject(approval_id):
+        return jsonify({
+            "ok": False,
+            "error": "Approbation introuvable"
+        }), 404
+
+    return jsonify({
+        "ok": True,
+        "status": "rejected"
+    })
+
+
+@app.route("/api/autonomy/cycle", methods=["POST"])
+def autonomy_cycle():
+    return jsonify({
+        "ok": True,
+        "results": run_cycle()
+    })
+
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=int(os.getenv("PORT", "5000")),
         debug=False,
     )
+
+# ============================================================
+# GAÏRUS AUTONOMY RUNTIME API
+# ============================================================
+
+from autonomy import (
+    start_autonomy_runtime,
+    autonomous_cycle,
+    runtime_status,
+)
+
+@app.route("/api/autonomy/runtime", methods=["GET"])
+def autonomy_runtime_status():
+    return jsonify(runtime_status())
+
+
+@app.route("/api/autonomy/runtime/start", methods=["POST"])
+def autonomy_runtime_start():
+    result = start_autonomy_runtime()
+    return jsonify(result), 200 if result.get("ok") else 500
+
+
+@app.route("/api/autonomy/runtime/cycle", methods=["POST"])
+def autonomy_runtime_cycle():
+    result = autonomous_cycle()
+    return jsonify(result), 200 if result.get("ok") else 500
+
+
+# Démarrage du runtime uniquement si l'autonomie est activée.
+try:
+    start_autonomy_runtime()
+except Exception as _autonomy_runtime_error:
+    print(
+        "GAIRUS AUTONOMY RUNTIME ERROR:",
+        _autonomy_runtime_error
+    )
+
+# ============================================================
+# GAÏRUS TRUE AUTONOMY API
+# ============================================================
+
+from autonomy import (
+    create_autonomous_mission,
+    autonomous_plan_mission,
+    autonomous_mission_cycle,
+)
+
+@app.route("/api/autonomy/mission/start", methods=["POST"])
+def autonomy_start_mission():
+    data = request.get_json(silent=True) or {}
+
+    objective = str(
+        data.get("objective")
+        or data.get("prompt")
+        or data.get("mission")
+        or ""
+    ).strip()
+
+    if not objective:
+        return jsonify({
+            "ok": False,
+            "error": "objective requis"
+        }), 400
+
+    result = create_autonomous_mission(
+        objective
+    )
+
+    return jsonify(result), 200 if result.get("ok") else 500
+
+
+@app.route("/api/autonomy/mission/<mission_id>/plan",
+           methods=["POST"])
+def autonomy_plan_existing_mission(mission_id):
+
+    result = autonomous_plan_mission(
+        mission_id
+    )
+
+    return jsonify(result), 200 if result.get("ok") else 500
+
+
+@app.route("/api/autonomy/mission/<mission_id>/run",
+           methods=["POST"])
+def autonomy_run_existing_mission(mission_id):
+
+    result = autonomous_mission_cycle(
+        mission_id
+    )
+
+    return jsonify(result), 200 if result.get("ok") else 500
