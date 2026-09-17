@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
+from providers import ask_with_fallback
+
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -246,53 +248,57 @@ def brain_for(prompt):
     return "orchestrator"
 
 
-def answer(prompt):
-    brain = brain_for(prompt)
+def answer(user_text, conversation_id=None):
+    """
+    Routeur IA multi-fournisseurs de Gaïrus.
 
-    memory = []
-    con = db()
-    rows = con.execute(
-        "SELECT content FROM memories ORDER BY id DESC LIMIT 8"
-    ).fetchall()
-    memory = [r["content"] for r in rows]
-    con.close()
+    Ordre automatique :
+    Gemini -> Groq -> Cerebras -> Mistral ->
+    OpenRouter -> NVIDIA -> Cloudflare -> Ollama
+    """
+
+    brain = brain_for(user_text)
 
     system = f"""
-Tu es {NAME}, un agent IA polyvalent.
-Cerveau actif : {brain}.
+Tu es Gaïrus, un agent IA autonome polyvalent.
 
-Tu dois être utile, précis, honnête sur tes capacités et orienté vers l'action.
-Tu peux planifier une mission, analyser un problème, développer du logiciel,
-faire de la recherche, travailler sur du business et organiser des tâches.
+Cerveau spécialisé actuel : {brain}
 
-Mémoire disponible :
-{chr(10).join(memory)}
-
-Si une capacité externe n'est pas réellement disponible, ne prétends jamais
-l'avoir exécutée.
+Tu dois :
+- comprendre précisément la demande ;
+- raisonner avant de répondre ;
+- être concret ;
+- signaler clairement les limites ;
+- ne jamais inventer une action accomplie ;
+- préparer les futures capacités d'outils et d'autonomie.
 """
 
-    full_prompt = system + "\n\nUtilisateur:\n" + prompt
+    result = ask_with_fallback(
+        prompt=user_text,
+        system=system,
+    )
 
-    result = provider_openai(full_prompt)
+    provider = result.get("provider")
+    model = result.get("model")
+    reply = result.get("reply")
 
-    if not result:
-        result = provider_anthropic(full_prompt)
+    if provider:
+        return {
+            "reply": reply,
+            "brain": brain,
+            "provider": provider,
+            "model": model,
+        }
 
-    if not result:
-        result = provider_ollama(full_prompt)
-
-    if not result:
-        result = (
-            "Gaïrus est correctement démarré, mais aucun fournisseur IA "
-            "n'est actuellement configuré. Ajoute une clé API et un modèle "
-            "dans les variables d'environnement de Render."
-        )
-
-    return result, brain
+    return {
+        "reply": reply,
+        "brain": brain,
+        "provider": None,
+        "model": None,
+        "errors": result.get("errors", []),
+    }
 
 
-@app.route("/")
 def index():
     return render_template("index.html")
 
