@@ -1,0 +1,6 @@
+gairus_memory.db
+__pycache__/
+*.pyc
+.env
+models/
+resource-manager/
