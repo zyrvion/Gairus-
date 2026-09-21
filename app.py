@@ -1,3 +1,4 @@
+from slack_gateway import slack_bp
 import os
 import json
 import sqlite3
@@ -789,3 +790,75 @@ def autonomy_run_existing_mission(mission_id):
     )
 
     return jsonify(result), 200 if result.get("ok") else 500
+
+
+# GAÏRUS / SLACK
+try:
+    app.register_blueprint(slack_bp)
+except Exception:
+    pass
+
+
+# ============================================================
+# GAÏRUS PROVIDER NETWORK API
+# ============================================================
+
+@app.get("/api/providers/network")
+def providers_network():
+    try:
+        from providers import provider_network_status
+        from provider_catalog import catalog_summary
+
+        return {
+            "ok": True,
+            "catalog": catalog_summary(),
+            "providers": provider_network_status(),
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+        }, 500
+
+
+@app.get("/api/providers/configured")
+def providers_configured():
+    try:
+        from providers import discover_provider_catalog
+
+        return {
+            "ok": True,
+            "providers": discover_provider_catalog(),
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+        }, 500
+
+
+# === GAIRUS_NETWORK_RUNTIME_API ===
+try:
+    from providers import network_health, provider_network, ask_network
+
+    @app.get("/api/providers/health")
+    def providers_health():
+        return network_health()
+
+    @app.get("/api/providers/list")
+    def providers_list():
+        return {
+            "ok": True,
+            "providers": provider_network()
+        }
+
+except Exception as e:
+
+    @app.get("/api/providers/health")
+    def providers_health_error():
+        return {
+            "ok": False,
+            "error": str(e)
+        }
+
+# === END GAIRUS_NETWORK_RUNTIME_API ===
