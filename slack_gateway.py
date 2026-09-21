@@ -229,6 +229,7 @@ def slack_command():
 # === GAIRUS_SLACK_SOCKET_MODE ===
 
 _socket_handler_started = False
+_socket_thread = None
 
 
 def start_slack_socket_mode():
@@ -236,7 +237,7 @@ def start_slack_socket_mode():
     Démarre l'écoute Slack en Socket Mode.
     L'endpoint HTTP /events reste également disponible.
     """
-    global _socket_handler_started
+    global _socket_handler_started, _socket_thread
 
     try:
         from dotenv import load_dotenv
@@ -349,6 +350,7 @@ def start_slack_socket_mode():
             name="gairus-slack-socket",
             daemon=True,
         )
+        _socket_thread = thread
         thread.start()
 
         _socket_handler_started = True
@@ -375,7 +377,11 @@ def slack_health():
         "signing_secret": bool(os.getenv("SLACK_SIGNING_SECRET", "").strip()),
         "app_token": bool(os.getenv("SLACK_APP_TOKEN", "").strip()),
         "events_endpoint": "/api/slack/events",
-        "commands_endpoint": "/api/slack/commands"
+        "commands_endpoint": "/api/slack/commands",
+        "socket_mode_started": _socket_handler_started,
+        "socket_thread_alive": bool(
+            _socket_thread and _socket_thread.is_alive()
+        )
     }
 
 # === END GAIRUS_SLACK_HEALTH ===
