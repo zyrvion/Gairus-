@@ -337,15 +337,22 @@ def start_slack_socket_mode():
         handler = SocketModeHandler(bolt_app, app_token)
 
         def _run():
-            try:
-                print("[GAIRUS][SLACK] Socket Mode démarrage...")
-                print("[GAIRUS][SLACK] Connexion WebSocket Slack...")
-                handler.start()
-            except Exception as exc:
-                _socket_error = f"{type(exc).__name__}: {exc}"
-                print(f"[GAIRUS][SLACK] Socket Mode arrêté : {_socket_error}")
-                import traceback
-                traceback.print_exc()
+            global _socket_error
+
+            while True:
+                try:
+                    print("[GAIRUS][SLACK] Socket Mode démarrage...")
+                    print("[GAIRUS][SLACK] Connexion WebSocket Slack...")
+                    handler.start()
+                    print("[GAIRUS][SLACK] Socket Mode terminé, reconnexion...")
+                    _socket_error = None
+                except Exception as exc:
+                    _socket_error = f"{type(exc).__name__}: {exc}"
+                    print(f"[GAIRUS][SLACK] Socket Mode arrêté : {_socket_error}")
+                    import traceback
+                    traceback.print_exc()
+
+                time.sleep(5)
 
         thread = threading.Thread(
             target=_run,
