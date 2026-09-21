@@ -238,6 +238,12 @@ def start_slack_socket_mode():
     """
     global _socket_handler_started
 
+    try:
+        from dotenv import load_dotenv
+        load_dotenv("/data/data/termux/files/home/gairus/.env")
+    except Exception:
+        pass
+
     if _socket_handler_started:
         return
 
@@ -331,9 +337,12 @@ def start_slack_socket_mode():
         def _run():
             try:
                 print("[GAIRUS][SLACK] Socket Mode démarrage...")
+                print("[GAIRUS][SLACK] Connexion WebSocket Slack...")
                 handler.start()
             except Exception as exc:
                 print(f"[GAIRUS][SLACK] Socket Mode arrêté : {exc}")
+                import traceback
+                traceback.print_exc()
 
         thread = threading.Thread(
             target=_run,
