@@ -230,6 +230,7 @@ def slack_command():
 
 _socket_handler_started = False
 _socket_thread = None
+_socket_error = None
 
 
 def start_slack_socket_mode():
@@ -237,7 +238,7 @@ def start_slack_socket_mode():
     Démarre l'écoute Slack en Socket Mode.
     L'endpoint HTTP /events reste également disponible.
     """
-    global _socket_handler_started, _socket_thread
+    global _socket_handler_started, _socket_thread, _socket_error
 
     try:
         from dotenv import load_dotenv
@@ -341,7 +342,8 @@ def start_slack_socket_mode():
                 print("[GAIRUS][SLACK] Connexion WebSocket Slack...")
                 handler.start()
             except Exception as exc:
-                print(f"[GAIRUS][SLACK] Socket Mode arrêté : {exc}")
+                _socket_error = f"{type(exc).__name__}: {exc}"
+                print(f"[GAIRUS][SLACK] Socket Mode arrêté : {_socket_error}")
                 import traceback
                 traceback.print_exc()
 
@@ -381,7 +383,8 @@ def slack_health():
         "socket_mode_started": _socket_handler_started,
         "socket_thread_alive": bool(
             _socket_thread and _socket_thread.is_alive()
-        )
+        ),
+        "socket_error": _socket_error
     }
 
 # === END GAIRUS_SLACK_HEALTH ===
