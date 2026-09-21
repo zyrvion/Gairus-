@@ -241,7 +241,7 @@ def start_slack_socket_mode():
 
     try:
         from dotenv import load_dotenv
-        load_dotenv("/data/data/termux/files/home/gairus/.env")
+        load_dotenv()
     except Exception:
         pass
 
