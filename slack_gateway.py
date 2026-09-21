@@ -343,9 +343,14 @@ def start_slack_socket_mode():
                 try:
                     print("[GAIRUS][SLACK] Socket Mode démarrage...")
                     print("[GAIRUS][SLACK] Connexion WebSocket Slack...")
-                    handler.start()
-                    print("[GAIRUS][SLACK] Socket Mode terminé, reconnexion...")
+                    handler.connect()
+                    print("[GAIRUS][SLACK] Socket Mode connecté")
                     _socket_error = None
+                    while True:
+                        time.sleep(30)
+                        if not handler.client.is_connected():
+                            print("[GAIRUS][SLACK] Connexion perdue, reconnexion...")
+                            break
                 except Exception as exc:
                     _socket_error = f"{type(exc).__name__}: {exc}"
                     print(f"[GAIRUS][SLACK] Socket Mode arrêté : {_socket_error}")
