@@ -19,6 +19,13 @@ import requests
 
 from flask import Blueprint, request, jsonify
 
+try:
+    from slack_bolt import App as SlackBoltApp
+    from slack_bolt.adapter.socket_mode import SocketModeHandler
+except ImportError:
+    SlackBoltApp = None
+    SocketModeHandler = None
+
 
 slack_bp = Blueprint("gairus_slack", __name__, url_prefix="/api/slack")
 
@@ -218,6 +225,131 @@ def slack_command():
 
     return jsonify({"ok": True})
 
+
+# === GAIRUS_SLACK_SOCKET_MODE ===
+
+_socket_handler_started = False
+
+
+def start_slack_socket_mode():
+    """
+    Démarre l'écoute Slack en Socket Mode.
+    L'endpoint HTTP /events reste également disponible.
+    """
+    global _socket_handler_started
+
+    if _socket_handler_started:
+        return
+
+    app_token = os.getenv("SLACK_APP_TOKEN", "").strip()
+    bot_token = os.getenv("SLACK_BOT_TOKEN", "").strip()
+
+    if not app_token or not bot_token:
+        print("[GAIRUS][SLACK] Socket Mode non démarré : token manquant")
+        return
+
+    if SlackBoltApp is None or SocketModeHandler is None:
+        print("[GAIRUS][SLACK] slack-bolt indisponible")
+        return
+
+    try:
+        bolt_app = SlackBoltApp(token=bot_token)
+
+        @bolt_app.event("app_mention")
+        def handle_app_mention(body, event, say, logger):
+            try:
+                text_value = event.get("text", "")
+                channel = event.get("channel")
+                ts = event.get("ts")
+
+                objective = text_value
+
+                # Retire la mention du bot.
+                if ">" in objective:
+                    objective = objective.split(">", 1)[1]
+
+                objective = objective.strip()
+
+                if not objective:
+                    say(
+                        text="Je suis là. Donne-moi simplement la mission à accomplir.",
+                        thread_ts=ts,
+                    )
+                    return
+
+                say(
+                    text=f"🧠 Gaïrus reçoit : {objective}",
+                    thread_ts=ts,
+                )
+
+                start_mission(objective, channel, ts)
+
+            except Exception as exc:
+                logger.exception("[GAIRUS][SLACK] Erreur app_mention")
+                try:
+                    say(
+                        text=f"⚠️ Erreur Gaïrus : `{exc}`",
+                        thread_ts=event.get("ts"),
+                    )
+                except Exception:
+                    pass
+
+        @bolt_app.command("/gairus")
+        def handle_gairus_command(ack, command, respond, logger):
+            ack()
+
+            try:
+                text_value = (command.get("text") or "").strip()
+                channel = command.get("channel_id", "")
+
+                if not text_value:
+                    respond(
+                        response_type="ephemeral",
+                        text="Utilisation : `/gairus fais quelque chose`",
+                    )
+                    return
+
+                respond(
+                    response_type="in_channel",
+                    text=f"🧠 Gaïrus reçoit : {text_value}",
+                )
+
+                start_mission(text_value, channel)
+
+            except Exception as exc:
+                logger.exception("[GAIRUS][SLACK] Erreur commande")
+                try:
+                    respond(
+                        response_type="ephemeral",
+                        text=f"⚠️ Erreur Gaïrus : `{exc}`",
+                    )
+                except Exception:
+                    pass
+
+        handler = SocketModeHandler(bolt_app, app_token)
+
+        def _run():
+            try:
+                print("[GAIRUS][SLACK] Socket Mode démarrage...")
+                handler.start()
+            except Exception as exc:
+                print(f"[GAIRUS][SLACK] Socket Mode arrêté : {exc}")
+
+        thread = threading.Thread(
+            target=_run,
+            name="gairus-slack-socket",
+            daemon=True,
+        )
+        thread.start()
+
+        _socket_handler_started = True
+        print("[GAIRUS][SLACK] Socket Mode activé")
+
+    except Exception as exc:
+        print(f"[GAIRUS][SLACK] Impossible de démarrer Socket Mode : {exc}")
+
+
+# === END GAIRUS_SLACK_SOCKET_MODE ===
 
 # === GAIRUS_SLACK_HEALTH ===
 @slack_bp.get("/health")

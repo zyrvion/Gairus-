@@ -1,4 +1,4 @@
-from slack_gateway import slack_bp
+from slack_gateway import slack_bp, start_slack_socket_mode
 import os
 import json
 import sqlite3
@@ -795,6 +795,7 @@ def autonomy_run_existing_mission(mission_id):
 # GAÏRUS / SLACK
 try:
     app.register_blueprint(slack_bp)
+    start_slack_socket_mode()
 except Exception:
     pass
 
