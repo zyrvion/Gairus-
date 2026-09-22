@@ -11,6 +11,14 @@ from core.enterprise_roles import has_permission
 from core.company_controller import CompanyController
 
 
+def get_gairus_id(engine):
+    return next(
+        employee_id
+        for employee_id, employee in engine.employees.items()
+        if employee.name == "Gaïrus"
+    )
+
+
 def test_bootstrap():
     engine = EnterpriseEngine()
 
@@ -44,21 +52,40 @@ def test_mission():
 
 
 def test_controller():
-    controller = CompanyController()
+    engine = EnterpriseEngine()
+    controller = CompanyController(engine)
 
-    gairus_id = next(
-        employee_id
-        for employee_id, employee in controller.enterprise.employees.items()
-        if employee.name == "Gaïrus"
-    )
+    gairus_id = get_gairus_id(engine)
 
     dashboard = controller.execute(
         gairus_id,
         "dashboard",
     )
 
+    assert dashboard["status"] == "ok"
     assert dashboard["company"]["name"] == "Entreprise Gaïrus"
     assert dashboard["employees"] >= 1
+    assert dashboard["departments"] >= 10
+    assert "missions" in dashboard
+    assert "kpis" in dashboard
+
+
+def test_controller_content():
+    engine = EnterpriseEngine()
+    controller = CompanyController(engine)
+
+    gairus_id = get_gairus_id(engine)
+
+    result = controller.execute(
+        gairus_id,
+        "create_content",
+        content_type="report",
+        title="Rapport de direction",
+        content="Rapport généré par Gaïrus.",
+    )
+
+    assert result["status"] == "ok"
+    assert result["content"]
 
 
 if __name__ == "__main__":
@@ -66,6 +93,7 @@ if __name__ == "__main__":
     test_general_director()
     test_mission()
     test_controller()
+    test_controller_content()
 
     print("=" * 60)
     print("GAÏRUS ENTERPRISE TESTS: OK")
