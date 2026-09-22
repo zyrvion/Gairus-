@@ -173,6 +173,142 @@ class EnterpriseEngine:
         self.missions[mission_id] = mission
         return mission.__dict__
 
+    def request_approval(
+        self,
+        actor_id,
+        action,
+        reason,
+        mission_id=None,
+        amount=None,
+        target_level=None,
+    ):
+        actor = self.employees.get(actor_id)
+
+        if actor is None:
+            return {
+                "status": "error",
+                "message": "Acteur inconnu",
+                "actor_id": actor_id,
+            }
+
+        if not hasattr(self, "approvals"):
+            self.approvals = {}
+
+        approval_id = f"APR-{len(self.approvals) + 1:06d}"
+
+        # Les actions sensibles remontent automatiquement
+        # vers le niveau humain lorsqu'elles concernent
+        # une signature, un transfert ou une décision légale.
+        human_actions = {
+            "legal_signature",
+            "bank_transfer",
+            "shareholder_decision",
+            "capital_operation",
+            "high_value_contract",
+            "official_filing",
+            "employment_contract",
+            "termination",
+        }
+
+        if action in human_actions:
+            required_level = 5
+        elif target_level is not None:
+            required_level = target_level
+        else:
+            required_level = min(actor.level + 1, 5)
+
+        candidates = [
+            employee
+            for employee in self.employees.values()
+            if employee.level >= required_level
+            and employee.id != actor.id
+        ]
+
+        candidates.sort(key=lambda employee: employee.level)
+
+        if not candidates:
+            return {
+                "status": "error",
+                "message": "Aucun approbateur disponible",
+                "required_level": required_level,
+            }
+
+        approver = candidates[0]
+
+        approval = {
+            "id": approval_id,
+            "actor_id": actor.id,
+            "actor_name": actor.name,
+            "actor_level": actor.level,
+            "approver_id": approver.id,
+            "approver_name": approver.name,
+            "approver_level": approver.level,
+            "action": action,
+            "reason": reason,
+            "mission_id": mission_id,
+            "amount": amount,
+            "status": "pending",
+        }
+
+        self.approvals[approval_id] = approval
+
+        return {
+            "status": "approval_required",
+            "approval": approval,
+        }
+
+    def resolve_approval(
+        self,
+        approval_id,
+        approver_id,
+        decision,
+        note=None,
+    ):
+        if not hasattr(self, "approvals"):
+            self.approvals = {}
+
+        approval = self.approvals.get(approval_id)
+
+        if approval is None:
+            return {
+                "status": "error",
+                "message": "Approbation inconnue",
+                "approval_id": approval_id,
+            }
+
+        approver = self.employees.get(approver_id)
+
+        if approver is None:
+            return {
+                "status": "error",
+                "message": "Approbateur inconnu",
+                "approver_id": approver_id,
+            }
+
+        if approver.id != approval["approver_id"] and approver.level < approval["approver_level"]:
+            return {
+                "status": "error",
+                "message": "Approbateur non autorisé",
+                "approver_id": approver.id,
+            }
+
+        if decision not in {"approved", "rejected"}:
+            return {
+                "status": "error",
+                "message": "Décision invalide",
+                "decision": decision,
+            }
+
+        approval["status"] = decision
+        approval["resolved_by"] = approver.id
+        approval["resolved_by_name"] = approver.name
+        approval["note"] = note
+
+        return {
+            "status": "resolved",
+            "approval": approval,
+        }
+
     def escalate(self, actor_id, reason, action=None, mission_id=None, target_level=None):
         actor = self.employees.get(actor_id)
 
