@@ -1,3 +1,4 @@
+from core.audit_gateway import AuditGateway
 from core.action_gateway import ActionGateway
 from core.governance_gate import GovernanceGate\nfrom typing import Any, Dict
 
@@ -26,6 +27,7 @@ class CompanyController:
     def __init__(self, enterprise=None):
         self.enterprise = enterprise or EnterpriseEngine()
         self.action_gateway = ActionGateway(enterprise=self.enterprise, controller=self)
+        self.audit_gateway = AuditGateway(enterprise=self.enterprise)
         self.governance_gate = GovernanceGate(self.enterprise)
 
     def _get_employee(self, actor_id):
@@ -61,6 +63,33 @@ class CompanyController:
             action=action,
             amount=amount,
             require_approval=True,
+        )
+
+
+    def audit_action(
+        self,
+        *,
+        actor_id=None,
+        action=None,
+        tool=None,
+        amount=None,
+        status=None,
+        result=None,
+        error=None,
+        mission_id=None,
+        metadata=None,
+    ):
+        return self.audit_gateway.record(
+            event="company_action",
+            actor_id=actor_id,
+            action=action,
+            tool=tool,
+            amount=amount,
+            status=status,
+            result=result,
+            error=error,
+            mission_id=mission_id,
+            metadata=metadata,
         )
 
     def execute(self, actor_id: str, action: str, **kwargs) -> Dict[str, Any]:

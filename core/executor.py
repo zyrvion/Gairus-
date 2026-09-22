@@ -1,5 +1,34 @@
+from core.audit_gateway import AuditGateway
 from core.action_gateway import ActionGateway
 class Executor:
+
+
+    def audit_execution(
+        self,
+        *,
+        actor_id=None,
+        action=None,
+        tool=None,
+        amount=None,
+        status=None,
+        result=None,
+        error=None,
+        mission_id=None,
+        metadata=None,
+    ):
+        return self.audit_gateway.record(
+            event="execution",
+            actor_id=actor_id,
+            action=action,
+            tool=tool,
+            amount=amount,
+            status=status,
+            result=result,
+            error=error,
+            mission_id=mission_id,
+            metadata=metadata,
+        )
+
 
     def authorize_action(
         self,
@@ -26,6 +55,7 @@ class Executor:
             enterprise=enterprise,
             controller=controller,
         )
+        self.audit_gateway = AuditGateway(enterprise=enterprise)
 enterprise=None, controller=None):
         self.permissions = permissions
 

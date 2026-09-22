@@ -1,3 +1,4 @@
+from .audit_gateway import AuditGateway
 from __future__ import annotations
 
 from .governance_gate import GovernanceGate, GovernanceBlocked
@@ -12,6 +13,7 @@ class ActionGateway:
     """
 
     def __init__(self, enterprise=None, controller=None):
+        self.audit_gateway = AuditGateway(enterprise=enterprise)
         self.enterprise = enterprise
         self.controller = controller
         self.governance = GovernanceGate(
