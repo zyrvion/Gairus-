@@ -43,6 +43,18 @@ class Mission:
 
 
 class EnterpriseEngine:
+    SENSITIVE_ACTIONS = {
+        "legal_signature",
+        "bank_transfer",
+        "shareholder_decision",
+        "capital_operation",
+        "high_value_contract",
+        "official_filing",
+        "employment_contract",
+        "termination",
+    }
+
+
     LEVELS = {
         "employee": 1,
         "manager": 2,
@@ -172,6 +184,60 @@ class EnterpriseEngine:
 
         self.missions[mission_id] = mission
         return mission.__dict__
+
+    def requires_human_approval(self, action, amount=None):
+        if action in self.SENSITIVE_ACTIONS:
+            return True
+
+        if amount is not None:
+            try:
+                return float(amount) > 0
+            except (TypeError, ValueError):
+                return False
+
+        return False
+
+    def governance_check(self, actor_id, action, amount=None):
+        actor = self.employees.get(actor_id)
+
+        if actor is None:
+            return {
+                "status": "error",
+                "message": "Acteur inconnu",
+                "actor_id": actor_id,
+            }
+
+        if not self.requires_human_approval(action, amount):
+            return {
+                "status": "allowed",
+                "actor_id": actor.id,
+                "action": action,
+                "approval_required": False,
+            }
+
+        existing = [
+            approval
+            for approval in getattr(self, "approvals", {}).values()
+            if approval.get("actor_id") == actor.id
+            and approval.get("action") == action
+            and approval.get("status") == "approved"
+        ]
+
+        if existing:
+            return {
+                "status": "allowed",
+                "actor_id": actor.id,
+                "action": action,
+                "approval_required": True,
+                "approval": existing[-1],
+            }
+
+        return {
+            "status": "approval_required",
+            "actor_id": actor.id,
+            "action": action,
+            "approval_required": True,
+        }
 
     def request_approval(
         self,
