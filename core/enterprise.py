@@ -173,24 +173,43 @@ class EnterpriseEngine:
         self.missions[mission_id] = mission
         return mission.__dict__
 
-    def delegate(self, mission_id, employee_id):
+    def delegate(
+        self,
+        mission_id,
+        employee_id,
+    ):
         mission = self.missions.get(mission_id)
-        employee = self.employees.get(employee_id)
 
-        if not mission or not employee:
+        if mission is None:
             return {
                 "status": "error",
-                "message": "Mission ou employé introuvable",
+                "message": "Mission inconnue",
+                "mission_id": mission_id,
             }
 
-        mission.owner_id = employee_id
-        mission.status = "delegated"
+        employee = self.employees.get(employee_id)
+
+        if employee is None:
+            return {
+                "status": "error",
+                "message": "Employé inconnu",
+                "employee_id": employee_id,
+            }
+
+        mission["assignee_id"] = employee_id
+        mission["assigned_to"] = employee.name
+        mission["status"] = "assigned"
+
+        for step in mission.get("steps", []):
+            if step["action"] == "delegate":
+                step["status"] = "completed"
 
         return {
             "status": "delegated",
             "mission_id": mission_id,
+            "owner_id": mission.get("owner_id"),
             "employee_id": employee_id,
-            "employee": employee.name,
+            "employee_name": employee.name,
         }
 
     def can_act(self, employee_id, permission):

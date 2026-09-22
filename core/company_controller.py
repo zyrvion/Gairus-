@@ -120,12 +120,17 @@ class CompanyController:
             }
 
         if action == "delegate":
+            delegation = self.enterprise.delegate(
+                mission_id=kwargs["mission_id"],
+                employee_id=kwargs["employee_id"],
+            )
+
+            if delegation.get("status") == "error":
+                return delegation
+
             return {
                 "status": "ok",
-                "delegation": self.enterprise.delegate(
-                    mission_id=kwargs["mission_id"],
-                    employee_id=kwargs["employee_id"],
-                ),
+                "delegation": delegation,
             }
 
         if action == "create_content":
