@@ -64,6 +64,13 @@ class CompanyController:
         if permission is None:
             return {
                 "status": "error",
+        if action == "governance":
+            return self.governance(
+                actor_id=employee.id,
+                requested_action=kwargs.get("requested_action"),
+                amount=kwargs.get("amount"),
+            )
+
                 "message": "Action inconnue",
                 "action": action,
             }
