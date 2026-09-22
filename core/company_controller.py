@@ -131,7 +131,6 @@ class CompanyController:
                 content_type=kwargs["content_type"],
                 title=kwargs["title"],
                 content=kwargs.get("content", ""),
-                author=employee.name,
             )
 
             return {
