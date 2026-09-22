@@ -173,13 +173,8 @@ class EnterpriseEngine:
         self.missions[mission_id] = mission
         return mission.__dict__
 
-    def delegate(
-        self,
-        mission_id,
-        employee_id,
-    ):
+    def delegate(self, mission_id, employee_id, delegator_id=None):
         mission = self.missions.get(mission_id)
-
         if mission is None:
             return {
                 "status": "error",
@@ -188,7 +183,6 @@ class EnterpriseEngine:
             }
 
         employee = self.employees.get(employee_id)
-
         if employee is None:
             return {
                 "status": "error",
@@ -196,9 +190,40 @@ class EnterpriseEngine:
                 "employee_id": employee_id,
             }
 
+        if delegator_id is not None:
+            delegator = self.employees.get(delegator_id)
+
+            if delegator is None:
+                return {
+                    "status": "error",
+                    "message": "Délégateur inconnu",
+                    "delegator_id": delegator_id,
+                }
+
+            if delegator.level < 2:
+                return {
+                    "status": "error",
+                    "message": "Niveau hiérarchique insuffisant pour déléguer",
+                    "delegator_id": delegator_id,
+                    "delegator_level": delegator.level,
+                }
+
+            if employee.level >= delegator.level:
+                return {
+                    "status": "error",
+                    "message": "Une délégation doit descendre dans la hiérarchie",
+                    "delegator_id": delegator.id,
+                    "delegator_level": delegator.level,
+                    "employee_id": employee.id,
+                    "employee_level": employee.level,
+                }
+
         mission["assignee_id"] = employee_id
         mission["assigned_to"] = employee.name
         mission["status"] = "assigned"
+
+        if delegator_id is not None:
+            mission["delegated_by"] = delegator_id
 
         for step in mission.get("steps", []):
             if step["action"] == "delegate":
@@ -208,6 +233,7 @@ class EnterpriseEngine:
             "status": "delegated",
             "mission_id": mission_id,
             "owner_id": mission.get("owner_id"),
+            "delegated_by": delegator_id,
             "employee_id": employee_id,
             "employee_name": employee.name,
         }
