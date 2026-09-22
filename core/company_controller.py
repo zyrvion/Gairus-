@@ -40,6 +40,13 @@ class CompanyController:
 
         return has_permission(role, permission)
 
+    def governance(self, actor_id, requested_action, amount=None):
+        return self.enterprise.governance_check(
+            actor_id=actor_id,
+            action=requested_action,
+            amount=amount,
+        )
+
     def execute(self, actor_id: str, action: str, **kwargs) -> Dict[str, Any]:
         employee = self._get_employee(actor_id)
 
