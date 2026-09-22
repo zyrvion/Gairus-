@@ -173,6 +173,107 @@ class EnterpriseEngine:
         self.missions[mission_id] = mission
         return mission.__dict__
 
+    def escalate(self, actor_id, reason, action=None, mission_id=None, target_level=None):
+        actor = self.employees.get(actor_id)
+
+        if actor is None:
+            return {
+                "status": "error",
+                "message": "Acteur inconnu",
+                "actor_id": actor_id,
+            }
+
+        if target_level is None:
+            target_level = min(actor.level + 1, 5)
+
+        candidates = [
+            employee
+            for employee in self.employees.values()
+            if employee.level >= target_level
+            and employee.id != actor.id
+        ]
+
+        if not candidates:
+            return {
+                "status": "error",
+                "message": "Aucun niveau hiérarchique disponible pour l'escalade",
+                "actor_id": actor.id,
+                "actor_level": actor.level,
+                "target_level": target_level,
+            }
+
+        candidates.sort(key=lambda employee: employee.level)
+
+        target = candidates[0]
+
+        escalation_id = f"ESC-{len(getattr(self, 'escalations', {})) + 1:06d}"
+
+        if not hasattr(self, "escalations"):
+            self.escalations = {}
+
+        escalation = {
+            "id": escalation_id,
+            "actor_id": actor.id,
+            "actor_name": actor.name,
+            "actor_level": actor.level,
+            "target_id": target.id,
+            "target_name": target.name,
+            "target_level": target.level,
+            "reason": reason,
+            "action": action,
+            "mission_id": mission_id,
+            "status": "pending",
+        }
+
+        self.escalations[escalation_id] = escalation
+
+        return {
+            "status": "escalated",
+            "escalation": escalation,
+        }
+
+    def resolve_escalation(self, escalation_id, resolver_id, decision, note=None):
+        if not hasattr(self, "escalations"):
+            self.escalations = {}
+
+        escalation = self.escalations.get(escalation_id)
+
+        if escalation is None:
+            return {
+                "status": "error",
+                "message": "Escalade inconnue",
+                "escalation_id": escalation_id,
+            }
+
+        resolver = self.employees.get(resolver_id)
+
+        if resolver is None:
+            return {
+                "status": "error",
+                "message": "Décideur inconnu",
+                "resolver_id": resolver_id,
+            }
+
+        if resolver.level < escalation["target_level"]:
+            return {
+                "status": "error",
+                "message": "Niveau insuffisant pour résoudre cette escalade",
+                "resolver_id": resolver.id,
+                "resolver_level": resolver.level,
+                "required_level": escalation["target_level"],
+            }
+
+        escalation["status"] = "resolved"
+        escalation["resolved_by"] = resolver.id
+        escalation["resolved_by_name"] = resolver.name
+        escalation["decision"] = decision
+        escalation["note"] = note
+
+        return {
+            "status": "resolved",
+            "escalation": escalation,
+        }
+
     def delegate(self, mission_id, employee_id, delegator_id=None):
         mission = self.missions.get(mission_id)
         if mission is None:
