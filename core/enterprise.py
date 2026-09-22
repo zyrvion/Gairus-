@@ -183,33 +183,62 @@ class EnterpriseEngine:
                 "actor_id": actor_id,
             }
 
-        if target_level is None:
-            target_level = min(actor.level + 1, 5)
+        # Escalade suivant la chaîne manager_id réelle.
+        chain = []
+        current = actor
 
-        candidates = [
-            employee
-            for employee in self.employees.values()
-            if employee.level >= target_level
-            and employee.id != actor.id
-        ]
+        while current.manager_id:
+            manager = self.employees.get(current.manager_id)
+
+            if manager is None:
+                break
+
+            chain.append(manager)
+            current = manager
+
+        if target_level is not None:
+            candidates = [
+                manager
+                for manager in chain
+                if manager.level >= target_level
+            ]
+        else:
+            candidates = chain
+
+        if not candidates:
+            # Cas particulier : Gaïrus peut remonter vers l'administration
+            # humaine lorsqu'aucun supérieur IA n'existe.
+            candidates = [
+                employee
+                for employee in self.employees.values()
+                if employee.level >= 5
+                and employee.id != actor.id
+            ]
 
         if not candidates:
             return {
                 "status": "error",
-                "message": "Aucun niveau hiérarchique disponible pour l'escalade",
+                "message": "Aucun supérieur disponible pour l'escalade",
                 "actor_id": actor.id,
                 "actor_level": actor.level,
-                "target_level": target_level,
             }
-
-        candidates.sort(key=lambda employee: employee.level)
 
         target = candidates[0]
 
-        escalation_id = f"ESC-{len(getattr(self, 'escalations', {})) + 1:06d}"
+        if target.level <= actor.level:
+            return {
+                "status": "error",
+                "message": "La cible d'escalade doit être hiérarchiquement supérieure",
+                "actor_id": actor.id,
+                "actor_level": actor.level,
+                "target_id": target.id,
+                "target_level": target.level,
+            }
 
         if not hasattr(self, "escalations"):
             self.escalations = {}
+
+        escalation_id = f"ESC-{len(self.escalations) + 1:06d}"
 
         escalation = {
             "id": escalation_id,
@@ -223,6 +252,14 @@ class EnterpriseEngine:
             "action": action,
             "mission_id": mission_id,
             "status": "pending",
+            "chain": [
+                {
+                    "id": employee.id,
+                    "name": employee.name,
+                    "level": employee.level,
+                }
+                for employee in chain
+            ],
         }
 
         self.escalations[escalation_id] = escalation
