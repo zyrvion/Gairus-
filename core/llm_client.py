@@ -1,63 +1,118 @@
-import json
 import os
-import urllib.request
-import urllib.error
+import json
+import requests
 
 
 class LLMClient:
+    """
+    Client LLM générique pour Gaïrus.
+
+    Backends compatibles :
+    - Ollama
+    - OpenAI-compatible
+    - LM Studio
+    - llama.cpp server
+    - autres serveurs exposant une API compatible
+    """
+
     def __init__(self):
+        self.provider = os.getenv("GAIRUS_LLM_PROVIDER", "auto").lower()
         self.base_url = os.getenv(
             "GAIRUS_LLM_URL",
             "http://127.0.0.1:11434"
         ).rstrip("/")
 
+        self.api_key = os.getenv("GAIRUS_LLM_API_KEY", "")
         self.model = os.getenv(
-            "GAIRUS_DEFAULT_MODEL",
+            "GAIRUS_LLM_MODEL",
             "deepseek"
         )
 
-    def available(self):
+        self.timeout = int(
+            os.getenv("GAIRUS_LLM_TIMEOUT", "120")
+        )
+
+    def _headers(self):
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        return headers
+
+    def _get(self, path):
         try:
-            request = urllib.request.Request(
-                f"{self.base_url}/api/tags",
-                method="GET"
+            response = requests.get(
+                f"{self.base_url}{path}",
+                headers=self._headers(),
+                timeout=5
             )
 
-            with urllib.request.urlopen(
-                request,
-                timeout=3
-            ) as response:
-                return response.status == 200
+            if response.ok:
+                return response.json()
 
         except Exception:
-            return False
+            pass
+
+        return None
+
+    def _detect_provider(self):
+        if self.provider != "auto":
+            return self.provider
+
+        if "11434" in self.base_url:
+            return "ollama"
+
+        return "openai"
+
+    def available(self):
+        return bool(self.models())
 
     def models(self):
-        try:
-            request = urllib.request.Request(
-                f"{self.base_url}/api/tags",
-                method="GET"
-            )
+        provider = self._detect_provider()
 
-            with urllib.request.urlopen(
-                request,
-                timeout=5
-            ) as response:
-                data = json.loads(
-                    response.read().decode("utf-8")
-                )
+        if provider == "ollama":
+            data = self._get("/api/tags")
+
+            if not data:
+                return []
+
+            models = data.get("models", [])
 
             return [
-                model.get("name")
-                for model in data.get("models", [])
-                if model.get("name")
+                item.get("name")
+                for item in models
+                if item.get("name")
             ]
 
-        except Exception:
-            return []
+        if provider in {"openai", "lmstudio", "llamacpp"}:
+            data = self._get("/v1/models")
 
-    def model_available(self, model):
-        return model in self.models()
+            if not data:
+                return []
+
+            return [
+                item.get("id")
+                for item in data.get("data", [])
+                if item.get("id")
+            ]
+
+        return []
+
+    def _select_model(self, requested=None):
+        installed = self.models()
+
+        requested = requested or self.model
+
+        if requested in installed:
+            return requested
+
+        if installed:
+            return installed[0]
+
+        return requested
 
     def chat(
         self,
@@ -66,46 +121,95 @@ class LLMClient:
         temperature=0.2,
         stream=False
     ):
-        selected_model = model or self.model
+        provider = self._detect_provider()
+        selected_model = self._select_model(model)
+
+        if provider == "ollama":
+            payload = {
+                "model": selected_model,
+                "messages": messages,
+                "stream": stream,
+                "options": {
+                    "temperature": temperature
+                }
+            }
+
+            try:
+                response = requests.post(
+                    f"{self.base_url}/api/chat",
+                    headers=self._headers(),
+                    json=payload,
+                    timeout=self.timeout
+                )
+
+                response.raise_for_status()
+
+                data = response.json()
+
+                return {
+                    "status": "success",
+                    "provider": "ollama",
+                    "model": selected_model,
+                    "content": data.get(
+                        "message",
+                        {}
+                    ).get(
+                        "content",
+                        ""
+                    ),
+                    "raw": data
+                }
+
+            except Exception as exc:
+                return {
+                    "status": "error",
+                    "provider": "ollama",
+                    "model": selected_model,
+                    "error": str(exc)
+                }
 
         payload = {
             "model": selected_model,
             "messages": messages,
-            "stream": stream,
-            "options": {
-                "temperature": temperature
-            }
+            "temperature": temperature,
+            "stream": stream
         }
 
-        request = urllib.request.Request(
-            f"{self.base_url}/api/chat",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json"
-            },
-            method="POST"
-        )
-
         try:
-            with urllib.request.urlopen(
-                request,
-                timeout=300
-            ) as response:
-                data = json.loads(
-                    response.read().decode("utf-8")
+            response = requests.post(
+                f"{self.base_url}/v1/chat/completions",
+                headers=self._headers(),
+                json=payload,
+                timeout=self.timeout
+            )
+
+            response.raise_for_status()
+
+            data = response.json()
+
+            choices = data.get("choices", [])
+
+            content = ""
+
+            if choices:
+                content = (
+                    choices[0]
+                    .get("message", {})
+                    .get("content", "")
                 )
 
-            return data.get("message", {}).get(
-                "content",
-                ""
-            )
+            return {
+                "status": "success",
+                "provider": provider,
+                "model": selected_model,
+                "content": content,
+                "raw": data
+            }
 
-        except urllib.error.HTTPError as exc:
-            body = exc.read().decode(
-                "utf-8",
-                errors="replace"
-            )
-
-            raise RuntimeError(
-                f"LLM HTTP {exc.code}: {body}"
-            ) from exc
+        except Exception as exc:
+            return {
+                "status": "error",
+                "provider": provider,
+                "model": selected_model,
+                "error": str(exc)
+            }
