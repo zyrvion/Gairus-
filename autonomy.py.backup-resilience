@@ -1,12 +1,8 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 import json
 import sqlite3
 import uuid
 import threading
-from providers import ask_resilient
 from datetime import datetime, timezone
 
 DB_PATH = os.getenv("GAIRUS_DB", "data/gairus.db")
@@ -1489,7 +1485,7 @@ def runtime_status():
 
 def ai_plan_mission(prompt):
     """Construit un plan de mission à partir de l'objectif."""
-    result = ask_resilient(
+    result = ask_with_fallback(
         prompt,
         system=(
             "Tu es le planificateur autonome de Gaïrus. "

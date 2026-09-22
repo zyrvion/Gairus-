@@ -1,12 +1,8 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 import json
 import sqlite3
 import uuid
 import threading
-from providers import ask_resilient
 from datetime import datetime, timezone
 
 DB_PATH = os.getenv("GAIRUS_DB", "data/gairus.db")
@@ -1323,7 +1319,7 @@ def autonomous_runtime_cycle():
 
     for mission in missions:
 
-        mission_id = mission["mission_id"]
+        mission_id = mission["id"]
 
         conn = db()
         cur = conn.cursor()
@@ -1489,7 +1485,7 @@ def runtime_status():
 
 def ai_plan_mission(prompt):
     """Construit un plan de mission à partir de l'objectif."""
-    result = ask_resilient(
+    result = ask_with_fallback(
         prompt,
         system=(
             "Tu es le planificateur autonome de Gaïrus. "
@@ -1586,57 +1582,7 @@ def create_autonomous_mission(objective):
 
 
 def autonomous_mission_cycle(mission_id):
-    """Exécute un cycle autonome pour une mission précise."""
-
-    mission_id = str(mission_id or "").strip()
-
-    if not mission_id:
-        return {
-            "ok": False,
-            "error": "mission_id requis",
-        }
-
-    with db() as conn:
-        mission = conn.execute(
-            "SELECT * FROM autonomy_missions WHERE mission_id=?",
-            (mission_id,),
-        ).fetchone()
-
-    if not mission:
-        return {
-            "ok": False,
-            "error": "Mission introuvable",
-            "mission_id": mission_id,
-        }
-
-    try:
-        result = run_cycle()
-
-        if isinstance(result, dict):
-            result.setdefault("ok", True)
-            result.setdefault("mission_id", mission_id)
-            return result
-
-        return {
-            "ok": True,
-            "mission_id": mission_id,
-            "result": result,
-        }
-
-    except Exception as exc:
-        event(
-            mission_id,
-            None,
-            None,
-            "mission_cycle_error",
-            str(exc),
-            {"error": str(exc)},
-        )
-
-        return {
-            "ok": False,
-            "mission_id": mission_id,
-            "error": str(exc),
-        }
+    """Exécute un cycle autonome pour une mission."""
+    return run_cycle()
 
 

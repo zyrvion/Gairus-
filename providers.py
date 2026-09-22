@@ -1,3 +1,7 @@
+from provider_catalog import PROVIDERS
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 import requests
 
@@ -147,3 +151,301 @@ def ask_with_fallback(prompt, system=None):
         ),
         "errors": errors,
     }
+# ============================================================
+# GAÏRUS — BRANCHEMENT DU ROUTEUR RÉSILIENT
+# ============================================================
+
+try:
+    from resilience import register_provider, resilient_call
+
+    def _resilient_existing_provider(name, prompt, system=None):
+        """
+        Adaptateur entre le routeur résilient et le système
+        de fournisseurs historique de Gaïrus.
+        """
+        return ask_provider(
+            name,
+            prompt,
+            system=system,
+        )
+
+    # Fournisseurs disponibles dans providers.py.
+    #
+    # Les priorités sont volontairement configurables par
+    # l'ordre et pourront être affinées ensuite.
+    _RESILIENT_PROVIDER_NAMES = [
+        "gemini",
+        "openrouter",
+        "kimi",
+    ]
+
+    for _provider_name in _RESILIENT_PROVIDER_NAMES:
+        try:
+            register_provider(
+                name=_provider_name,
+                handler=lambda prompt, system=None,
+                _name=_provider_name: _resilient_existing_provider(
+                    _name,
+                    prompt,
+                    system,
+                ),
+                capabilities={"text", "reasoning"},
+                priority={
+                    "gemini": 10,
+                    "kimi": 20,
+                    "openrouter": 30,
+                }.get(_provider_name, 100),
+                timeout=float(
+                    os.getenv(
+                        "GAIRUS_PROVIDER_TIMEOUT",
+                        "45",
+                    )
+                ),
+                max_retries=int(
+                    os.getenv(
+                        "GAIRUS_PROVIDER_RETRIES",
+                        "2",
+                    )
+                ),
+                cooldown=float(
+                    os.getenv(
+                        "GAIRUS_PROVIDER_COOLDOWN",
+                        "30",
+                    )
+                ),
+            )
+        except Exception:
+            pass
+
+except Exception:
+    # Le système historique reste fonctionnel même si le
+    # module de résilience n'est momentanément pas disponible.
+    pass
+
+
+def ask_resilient(prompt, system=None, preferred=None):
+    """
+    Point d'entrée résilient pour le cerveau de Gaïrus.
+
+    Utilisation :
+
+        ask_resilient(
+            "Explique-moi...",
+            system="...",
+        )
+
+    Retourne le texte du fournisseur ayant réussi.
+    """
+
+    try:
+        result = resilient_call(
+            "text",
+            prompt,
+            system=system,
+            preferred=preferred,
+        )
+
+        if result.get("ok"):
+            return result.get("result")
+
+        # Dernier filet de sécurité :
+        # retour au système historique.
+        return ask_with_fallback(
+            prompt,
+            system=system,
+        )
+
+    except Exception:
+        return ask_with_fallback(
+            prompt,
+            system=system,
+        )
+
+
+# ============================================================
+# GAÏRUS DYNAMIC PROVIDER DISCOVERY
+# ============================================================
+
+def discover_provider_catalog():
+    """
+    Découvre automatiquement les fournisseurs dont les identifiants
+    sont présents dans l'environnement.
+    """
+    import os
+
+    discovered = []
+
+    for provider in PROVIDERS:
+        env_name = provider.get("env")
+
+        if not env_name:
+            continue
+
+        configured = bool(os.getenv(env_name, "").strip())
+
+        if provider.get("type") == "local":
+            configured = bool(os.getenv(env_name, "").strip())
+
+        if configured:
+            discovered.append({
+                "id": provider["id"],
+                "name": provider["name"],
+                "model": os.getenv(
+                    provider.get("model_env", ""),
+                    provider.get("default_model", "")
+                ),
+                "type": provider["type"],
+                "protocol": provider["protocol"],
+                "capabilities": provider["capabilities"],
+                "priority": provider["priority"],
+                "pricing": provider["pricing"],
+            })
+
+    return sorted(discovered, key=lambda x: x["priority"])
+
+
+def provider_network_status():
+    """
+    Retourne l'état de tout le réseau de fournisseurs.
+    Ne retourne JAMAIS les valeurs des clés.
+    """
+    import os
+
+    result = []
+
+    for provider in PROVIDERS:
+        env_name = provider.get("env")
+        configured = bool(
+            os.getenv(env_name, "").strip()
+        ) if env_name else False
+
+        result.append({
+            "id": provider["id"],
+            "name": provider["name"],
+            "configured": configured,
+            "type": provider["type"],
+            "pricing": provider["pricing"],
+            "priority": provider["priority"],
+            "capabilities": provider["capabilities"],
+        })
+
+    return result
+
+
+# === GAIRUS_DYNAMIC_NETWORK_ROUTER ===
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
+
+try:
+    from provider_catalog import PROVIDERS
+    from resilience import RESILIENT_ROUTER
+except Exception:
+    PROVIDERS = []
+    RESILIENT_ROUTER = None
+
+
+def _catalog_provider_configured(provider):
+    import os
+    env_name = provider.get("env")
+    if not env_name:
+        return False
+    return bool(os.getenv(env_name, "").strip())
+
+
+def configured_provider_catalog():
+    return [
+        p for p in PROVIDERS
+        if _catalog_provider_configured(p)
+    ]
+
+
+def provider_network():
+    result = []
+
+    for p in PROVIDERS:
+        result.append({
+            "id": p.get("id"),
+            "name": p.get("name"),
+            "type": p.get("type"),
+            "protocol": p.get("protocol"),
+            "model": p.get("default_model"),
+            "configured": _catalog_provider_configured(p),
+            "priority": p.get("priority", 100),
+            "capabilities": p.get("capabilities", []),
+        })
+
+    return sorted(
+        result,
+        key=lambda x: (
+            not x["configured"],
+            x["priority"],
+            x["name"] or ""
+        )
+    )
+
+
+def ask_network(prompt, system=None, preferred=None):
+    """
+    Point d'entrée principal de Gaïrus.
+    Utilise d'abord le routeur résilient existant.
+    Si aucun fournisseur configuré n'est disponible,
+    retombe sur l'ancien système de fallback.
+    """
+
+    try:
+        if RESILIENT_ROUTER is not None:
+            result = ask_resilient(
+                prompt,
+                system=system,
+                preferred=preferred
+            )
+
+            if result and result.get("reply"):
+                return result
+
+    except Exception as e:
+        fallback_error = str(e)
+    else:
+        fallback_error = None
+
+    try:
+        reply = ask_with_fallback(prompt, system=system)
+
+        return {
+            "provider": "legacy-fallback",
+            "model": None,
+            "reply": reply,
+            "errors": [fallback_error] if fallback_error else []
+        }
+
+    except Exception as e:
+        return {
+            "provider": None,
+            "model": None,
+            "reply": "Aucun fournisseur IA disponible.",
+            "errors": [str(e)]
+        }
+
+
+def network_health():
+    configured = configured_provider_catalog()
+
+    return {
+        "ok": True,
+        "total": len(PROVIDERS),
+        "configured": len(configured),
+        "providers": [
+            {
+                "id": p.get("id"),
+                "name": p.get("name"),
+                "type": p.get("type"),
+                "protocol": p.get("protocol"),
+                "model": p.get("default_model"),
+            }
+            for p in configured
+        ]
+    }
+
+# === END GAIRUS_DYNAMIC_NETWORK_ROUTER ===

@@ -16,8 +16,6 @@ import hashlib
 import time
 import threading
 import requests
-from dotenv import load_dotenv
-load_dotenv()
 
 from flask import Blueprint, request, jsonify
 
@@ -108,7 +106,12 @@ def _run_mission_async(objective, channel, thread_ts):
         from autonomy import create_autonomous_mission
         from autonomy import autonomous_mission_cycle
 
-        mission_id = create_autonomous_mission(objective)
+        mission = create_autonomous_mission(
+            objective=objective,
+            title=f"Mission Slack: {objective[:80]}",
+        )
+
+        mission_id = mission.get("mission_id")
 
         if not mission_id:
             send_message(
@@ -226,8 +229,6 @@ def slack_command():
 # === GAIRUS_SLACK_SOCKET_MODE ===
 
 _socket_handler_started = False
-_socket_thread = None
-_socket_error = None
 
 
 def start_slack_socket_mode():
@@ -235,13 +236,7 @@ def start_slack_socket_mode():
     Démarre l'écoute Slack en Socket Mode.
     L'endpoint HTTP /events reste également disponible.
     """
-    global _socket_handler_started, _socket_thread, _socket_error
-
-    try:
-        from dotenv import load_dotenv
-        load_dotenv()
-    except Exception:
-        pass
+    global _socket_handler_started
 
     if _socket_handler_started:
         return
@@ -287,7 +282,7 @@ def start_slack_socket_mode():
                     thread_ts=ts,
                 )
 
-                # start_mission(objective, channel, ts)  # TEST RAPIDITE
+                start_mission(objective, channel, ts)
 
             except Exception as exc:
                 logger.exception("[GAIRUS][SLACK] Erreur app_mention")
@@ -334,34 +329,17 @@ def start_slack_socket_mode():
         handler = SocketModeHandler(bolt_app, app_token)
 
         def _run():
-            global _socket_error
-
-            while True:
-                try:
-                    print("[GAIRUS][SLACK] Socket Mode démarrage...")
-                    print("[GAIRUS][SLACK] Connexion WebSocket Slack...")
-                    handler.connect()
-                    print("[GAIRUS][SLACK] Socket Mode connecté")
-                    _socket_error = None
-                    while True:
-                        time.sleep(30)
-                        if not handler.client.is_connected():
-                            print("[GAIRUS][SLACK] Connexion perdue, reconnexion...")
-                            break
-                except Exception as exc:
-                    _socket_error = f"{type(exc).__name__}: {exc}"
-                    print(f"[GAIRUS][SLACK] Socket Mode arrêté : {_socket_error}")
-                    import traceback
-                    traceback.print_exc()
-
-                time.sleep(5)
+            try:
+                print("[GAIRUS][SLACK] Socket Mode démarrage...")
+                handler.start()
+            except Exception as exc:
+                print(f"[GAIRUS][SLACK] Socket Mode arrêté : {exc}")
 
         thread = threading.Thread(
             target=_run,
             name="gairus-slack-socket",
             daemon=True,
         )
-        _socket_thread = thread
         thread.start()
 
         _socket_handler_started = True
@@ -388,12 +366,7 @@ def slack_health():
         "signing_secret": bool(os.getenv("SLACK_SIGNING_SECRET", "").strip()),
         "app_token": bool(os.getenv("SLACK_APP_TOKEN", "").strip()),
         "events_endpoint": "/api/slack/events",
-        "commands_endpoint": "/api/slack/commands",
-        "socket_mode_started": _socket_handler_started,
-        "socket_thread_alive": bool(
-            _socket_thread and _socket_thread.is_alive()
-        ),
-        "socket_error": _socket_error
+        "commands_endpoint": "/api/slack/commands"
     }
 
 # === END GAIRUS_SLACK_HEALTH ===

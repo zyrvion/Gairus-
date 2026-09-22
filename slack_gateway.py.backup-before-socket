@@ -16,17 +16,8 @@ import hashlib
 import time
 import threading
 import requests
-from dotenv import load_dotenv
-load_dotenv()
 
 from flask import Blueprint, request, jsonify
-
-try:
-    from slack_bolt import App as SlackBoltApp
-    from slack_bolt.adapter.socket_mode import SocketModeHandler
-except ImportError:
-    SlackBoltApp = None
-    SocketModeHandler = None
 
 
 slack_bp = Blueprint("gairus_slack", __name__, url_prefix="/api/slack")
@@ -108,7 +99,12 @@ def _run_mission_async(objective, channel, thread_ts):
         from autonomy import create_autonomous_mission
         from autonomy import autonomous_mission_cycle
 
-        mission_id = create_autonomous_mission(objective)
+        mission = create_autonomous_mission(
+            objective=objective,
+            title=f"Mission Slack: {objective[:80]}",
+        )
+
+        mission_id = mission.get("mission_id")
 
         if not mission_id:
             send_message(
@@ -223,156 +219,6 @@ def slack_command():
     return jsonify({"ok": True})
 
 
-# === GAIRUS_SLACK_SOCKET_MODE ===
-
-_socket_handler_started = False
-_socket_thread = None
-_socket_error = None
-
-
-def start_slack_socket_mode():
-    """
-    Démarre l'écoute Slack en Socket Mode.
-    L'endpoint HTTP /events reste également disponible.
-    """
-    global _socket_handler_started, _socket_thread, _socket_error
-
-    try:
-        from dotenv import load_dotenv
-        load_dotenv()
-    except Exception:
-        pass
-
-    if _socket_handler_started:
-        return
-
-    app_token = os.getenv("SLACK_APP_TOKEN", "").strip()
-    bot_token = os.getenv("SLACK_BOT_TOKEN", "").strip()
-
-    if not app_token or not bot_token:
-        print("[GAIRUS][SLACK] Socket Mode non démarré : token manquant")
-        return
-
-    if SlackBoltApp is None or SocketModeHandler is None:
-        print("[GAIRUS][SLACK] slack-bolt indisponible")
-        return
-
-    try:
-        bolt_app = SlackBoltApp(token=bot_token)
-
-        @bolt_app.event("app_mention")
-        def handle_app_mention(body, event, say, logger):
-            try:
-                text_value = event.get("text", "")
-                channel = event.get("channel")
-                ts = event.get("ts")
-
-                objective = text_value
-
-                # Retire la mention du bot.
-                if ">" in objective:
-                    objective = objective.split(">", 1)[1]
-
-                objective = objective.strip()
-
-                if not objective:
-                    say(
-                        text="Je suis là. Donne-moi simplement la mission à accomplir.",
-                        thread_ts=ts,
-                    )
-                    return
-
-                say(
-                    text=f"🧠 Gaïrus reçoit : {objective}",
-                    thread_ts=ts,
-                )
-
-                # start_mission(objective, channel, ts)  # TEST RAPIDITE
-
-            except Exception as exc:
-                logger.exception("[GAIRUS][SLACK] Erreur app_mention")
-                try:
-                    say(
-                        text=f"⚠️ Erreur Gaïrus : `{exc}`",
-                        thread_ts=event.get("ts"),
-                    )
-                except Exception:
-                    pass
-
-        @bolt_app.command("/gairus")
-        def handle_gairus_command(ack, command, respond, logger):
-            ack()
-
-            try:
-                text_value = (command.get("text") or "").strip()
-                channel = command.get("channel_id", "")
-
-                if not text_value:
-                    respond(
-                        response_type="ephemeral",
-                        text="Utilisation : `/gairus fais quelque chose`",
-                    )
-                    return
-
-                respond(
-                    response_type="in_channel",
-                    text=f"🧠 Gaïrus reçoit : {text_value}",
-                )
-
-                start_mission(text_value, channel)
-
-            except Exception as exc:
-                logger.exception("[GAIRUS][SLACK] Erreur commande")
-                try:
-                    respond(
-                        response_type="ephemeral",
-                        text=f"⚠️ Erreur Gaïrus : `{exc}`",
-                    )
-                except Exception:
-                    pass
-
-        handler = SocketModeHandler(bolt_app, app_token)
-
-        def _run():
-            global _socket_error
-
-            while True:
-                try:
-                    print("[GAIRUS][SLACK] Socket Mode démarrage...")
-                    print("[GAIRUS][SLACK] Connexion WebSocket Slack...")
-                    handler.connect()
-                    print("[GAIRUS][SLACK] Socket Mode connecté")
-                    _socket_error = None
-                    while True:
-                        time.sleep(30)
-                        if not handler.client.is_connected():
-                            print("[GAIRUS][SLACK] Connexion perdue, reconnexion...")
-                            break
-                except Exception as exc:
-                    _socket_error = f"{type(exc).__name__}: {exc}"
-                    print(f"[GAIRUS][SLACK] Socket Mode arrêté : {_socket_error}")
-                    import traceback
-                    traceback.print_exc()
-
-                time.sleep(5)
-
-        thread = threading.Thread(
-            target=_run,
-            name="gairus-slack-socket",
-            daemon=True,
-        )
-        _socket_thread = thread
-        thread.start()
-
-        _socket_handler_started = True
-        print("[GAIRUS][SLACK] Socket Mode activé")
-
-    except Exception as exc:
-        print(f"[GAIRUS][SLACK] Impossible de démarrer Socket Mode : {exc}")
-
-
-# === END GAIRUS_SLACK_SOCKET_MODE ===
-
 # === GAIRUS_SLACK_HEALTH ===
 @slack_bp.get("/health")
 def slack_health():
@@ -388,12 +234,7 @@ def slack_health():
         "signing_secret": bool(os.getenv("SLACK_SIGNING_SECRET", "").strip()),
         "app_token": bool(os.getenv("SLACK_APP_TOKEN", "").strip()),
         "events_endpoint": "/api/slack/events",
-        "commands_endpoint": "/api/slack/commands",
-        "socket_mode_started": _socket_handler_started,
-        "socket_thread_alive": bool(
-            _socket_thread and _socket_thread.is_alive()
-        ),
-        "socket_error": _socket_error
+        "commands_endpoint": "/api/slack/commands"
     }
 
 # === END GAIRUS_SLACK_HEALTH ===
