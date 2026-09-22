@@ -100,17 +100,23 @@ class CompanyController:
             }
 
         if action == "create_mission":
+            mission = self.enterprise.create_mission(
+                title=kwargs["title"],
+                objective=kwargs["objective"],
+                department_id=kwargs.get(
+                    "department_id",
+                    employee.department,
+                ),
+                priority=kwargs.get(
+                    "priority",
+                    "medium",
+                ),
+                owner_id=employee.id,
+            )
+
             return {
                 "status": "ok",
-                "mission": self.enterprise.create_mission(
-                    title=kwargs["title"],
-                    objective=kwargs["objective"],
-                    department_id=kwargs.get(
-                        "department_id",
-                        employee.department,
-                    ),
-                    priority=kwargs.get("priority", "medium"),
-                ),
+                "mission": mission,
             }
 
         if action == "delegate":
