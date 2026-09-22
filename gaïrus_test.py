@@ -1,11 +1,27 @@
 from gairus_engine import GairusEngine
 
 
-if __name__ == "__main__":
+def main():
     engine = GairusEngine()
 
-    result = engine.ask(
-        "Analyser cette mission et déterminer l'agent approprié"
-    )
+    tests = [
+        "Développer une application Python",
+        "Faire une recherche approfondie sur les agents IA",
+        "Analyser un document",
+        "Organiser une réunion",
+        "Répondre à une question générale",
+    ]
 
-    print(result)
+    for request in tests:
+        result = engine.ask(request)
+
+        print("\n" + "=" * 60)
+        print("MISSION :", result["objective"])
+        print("AGENT   :", result["route"])
+        print("STATUS  :", result["status"])
+        print("MODEL   :", result.get("model", "auto"))
+        print("VERIFY  :", result["verification"]["verified"])
+
+
+if __name__ == "__main__":
+    main()

@@ -1,9 +1,12 @@
 from datetime import datetime, timezone
+import json
+from pathlib import Path
 
 
 class AuditLog:
-    def __init__(self):
-        self.events = []
+    def __init__(self, path="data/audit.log"):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def record(self, event, data=None):
         entry = {
@@ -11,8 +14,25 @@ class AuditLog:
             "event": event,
             "data": data,
         }
-        self.events.append(entry)
+
+        with self.path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(
+                entry,
+                ensure_ascii=False
+            ) + "\n")
+
         return entry
 
     def all(self):
-        return list(self.events)
+        if not self.path.exists():
+            return []
+
+        result = []
+
+        for line in self.path.read_text(
+            encoding="utf-8"
+        ).splitlines():
+            if line.strip():
+                result.append(json.loads(line))
+
+        return result
