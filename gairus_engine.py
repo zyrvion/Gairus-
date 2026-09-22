@@ -1,3 +1,6 @@
+from core.company_controller import CompanyController
+from agents.company import CompanyAgent
+from agents.content import ContentAgent
 from core.orchestrator import GairusOrchestrator
 from core.model_router import ModelRouter
 from core.llm_client import LLMClient
@@ -5,7 +8,10 @@ from agents.registry import AgentRegistry
 
 
 class GairusEngine:
+    # Enterprise control plane
+
     def __init__(self):
+        self.company_controller = CompanyController()
         self.orchestrator = GairusOrchestrator()
         self.registry = AgentRegistry()
         self.model_router = ModelRouter()
