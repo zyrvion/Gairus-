@@ -23,7 +23,7 @@ class AgentRegistry:
     def names(self):
         return list(self.agents.keys())
 
-    def run(self, name, task):
+    def run(self, name, task, context=None):
         agent = self.get(name)
 
         if agent is None:
@@ -31,4 +31,4 @@ class AgentRegistry:
                 f"Agent inconnu: {name}"
             )
 
-        return agent.run(task)
+        return agent.run(task, context)
