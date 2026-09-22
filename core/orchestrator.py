@@ -13,7 +13,7 @@ class GairusOrchestrator:
         self.permissions = PermissionManager()
         self.planner = Planner()
         self.router = ModelRouter()
-        self.executor = Executor(self.permissions)
+        self.executor = Executor(self.permissions, enterprise=self.company_controller.enterprise, controller=self.company_controller)
         self.verifier = Verifier()
         self.missions = MissionEngine()
         self.audit = AuditLog()

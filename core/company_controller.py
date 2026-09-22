@@ -1,3 +1,4 @@
+from core.action_gateway import ActionGateway
 from core.governance_gate import GovernanceGate\nfrom typing import Any, Dict
 
 from core.enterprise import EnterpriseEngine
@@ -24,6 +25,7 @@ class CompanyController:
 
     def __init__(self, enterprise=None):
         self.enterprise = enterprise or EnterpriseEngine()
+        self.action_gateway = ActionGateway(enterprise=self.enterprise, controller=self)
         self.governance_gate = GovernanceGate(self.enterprise)
 
     def _get_employee(self, actor_id):
