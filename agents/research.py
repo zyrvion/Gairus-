@@ -7,7 +7,7 @@ class ResearchAgent:
     def __init__(self):
         self.llm = LLMClient()
 
-    def run(self, task, context=None):
+    def run(self, task, context=None, model=None):
         messages = [
             {
                 "role": "system",
@@ -44,5 +44,8 @@ class ResearchAgent:
             "agent": self.name,
             "task": task,
             "status": "completed",
-            "answer": self.llm.chat(messages)
+            "answer": self.llm.chat(
+                messages,
+                model=model
+            )
         }

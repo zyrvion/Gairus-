@@ -1,6 +1,7 @@
 import json
 import os
 import urllib.request
+import urllib.error
 
 
 class LLMClient:
@@ -55,6 +56,9 @@ class LLMClient:
         except Exception:
             return []
 
+    def model_available(self, model):
+        return model in self.models()
+
     def chat(
         self,
         messages,
@@ -62,8 +66,10 @@ class LLMClient:
         temperature=0.2,
         stream=False
     ):
+        selected_model = model or self.model
+
         payload = {
-            "model": model or self.model,
+            "model": selected_model,
             "messages": messages,
             "stream": stream,
             "options": {
@@ -80,15 +86,26 @@ class LLMClient:
             method="POST"
         )
 
-        with urllib.request.urlopen(
-            request,
-            timeout=300
-        ) as response:
-            data = json.loads(
-                response.read().decode("utf-8")
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=300
+            ) as response:
+                data = json.loads(
+                    response.read().decode("utf-8")
+                )
+
+            return data.get("message", {}).get(
+                "content",
+                ""
             )
 
-        return data.get("message", {}).get(
-            "content",
-            ""
-        )
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode(
+                "utf-8",
+                errors="replace"
+            )
+
+            raise RuntimeError(
+                f"LLM HTTP {exc.code}: {body}"
+            ) from exc

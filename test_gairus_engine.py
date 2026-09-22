@@ -5,17 +5,27 @@ def main():
     engine = GairusEngine()
 
     print("GAÏRUS STATUS")
-    print(engine.status())
+    print("=" * 60)
+
+    status = engine.status()
+
+    print("LLM URL       :", status["llm_url"])
+    print("LLM AVAILABLE :", status["llm_available"])
+    print("MODELS        :", status["models"])
+    print("AGENTS        :", status["agents"])
 
     print("\nGAÏRUS ROUTING")
+    print("=" * 60)
 
-    for task in (
+    tasks = (
         "Développer une application Python",
         "Faire une recherche sur les agents IA",
         "Analyser un document PDF",
         "Préparer une réunion",
         "Répondre à une question générale",
-    ):
+    )
+
+    for task in tasks:
         result = engine.ask(task)
 
         print("\n" + "=" * 60)

@@ -18,20 +18,35 @@ class GairusEngine:
         )
 
         agent_name = mission["route"]
+
         choice = self.model_router.choose(
             request,
             complexity
         )
 
+        selected_model = choice.model
+
+        installed_models = self.llm.models()
+
+        if installed_models:
+            if selected_model not in installed_models:
+                selected_model = (
+                    self.llm.model
+                    if self.llm.model in installed_models
+                    else installed_models[0]
+                )
+
         agent_result = self.registry.run(
             agent_name,
             request,
-            context
+            context,
+            selected_model
         )
 
         mission["model"] = {
             "provider": choice.provider,
-            "name": choice.model,
+            "requested": choice.model,
+            "selected": selected_model,
             "mode": choice.mode,
             "reason": choice.reason,
         }
@@ -41,9 +56,11 @@ class GairusEngine:
         return mission
 
     def status(self):
+        installed_models = self.llm.models()
+
         return {
             "llm_url": self.llm.base_url,
-            "llm_available": self.llm.available(),
-            "models": self.llm.models(),
+            "llm_available": bool(installed_models),
+            "models": installed_models,
             "agents": self.registry.names(),
         }

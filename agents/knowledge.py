@@ -7,14 +7,16 @@ class KnowledgeAgent:
     def __init__(self):
         self.llm = LLMClient()
 
-    def run(self, task, context=None):
+    def run(self, task, context=None, model=None):
         messages = [
             {
                 "role": "system",
                 "content": (
                     "Tu es l'agent de connaissance de Gaïrus. "
                     "Réponds uniquement à partir du contexte fourni "
-                    "lorsqu'il est disponible."
+                    "lorsqu'il est disponible. "
+                    "Si le contexte ne contient pas la réponse, "
+                    "indique-le clairement."
                 ),
             }
         ]
@@ -42,5 +44,8 @@ class KnowledgeAgent:
             "agent": self.name,
             "task": task,
             "status": "completed",
-            "answer": self.llm.chat(messages)
+            "answer": self.llm.chat(
+                messages,
+                model=model
+            )
         }
