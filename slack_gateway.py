@@ -15,6 +15,9 @@ import hmac
 import hashlib
 import time
 import threading
+
+# Une seule mission autonome SQLite à la fois.
+_MISSION_LOCK = threading.Lock()
 import requests
 from dotenv import load_dotenv
 load_dotenv()
@@ -126,7 +129,8 @@ def _run_mission_async(objective, channel, thread_ts):
             )
             return
 
-        result = autonomous_mission_cycle(mission_id)
+        with _MISSION_LOCK:
+            result = autonomous_mission_cycle(mission_id)
 
         if isinstance(result, dict) and result.get("ok"):
             reply = str(result.get("reply") or "").strip()
