@@ -1541,6 +1541,12 @@ def ai_plan_mission(prompt):
     try:
         import tools
         available_tools = tools.list_tools_for_model()
+
+        self_tools = ", ".join(sorted(SELF_MODIFICATION_TOOLS))
+        available_tools = (
+            f"{available_tools}\n"
+            f"Outils internes d'auto-modification : {self_tools}"
+        )
     except Exception:
         available_tools = "Aucun outil externe disponible."
 
