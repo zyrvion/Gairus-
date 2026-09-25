@@ -9,6 +9,7 @@ import threading
 
 _GAIRUS_MISSION_LOCK = threading.RLock()
 from providers import ask_resilient
+from self_code_tools import REGISTRY as SELF_CODE_REGISTRY
 from datetime import datetime, timezone
 
 DB_PATH = os.getenv("GAIRUS_DB", "data/gairus.db")
@@ -1116,6 +1117,8 @@ TOOL_REGISTRY = {
     "memory_write": tool_memory_write,
     "http_get": tool_http_get,
 }
+
+TOOL_REGISTRY.update(SELF_CODE_REGISTRY)
 
 
 APPROVAL_REQUIRED_TOOLS = {
