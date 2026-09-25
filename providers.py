@@ -45,23 +45,60 @@ PROVIDERS = {
 
 
 def call_openai_provider(name, prompt, system=None):
-    cfg = PROVIDERS[name]
-    key = os.getenv(cfg["env"])
+    # Recherche le fournisseur dans le catalogue réel.
+    cfg = next(
+        (
+            item for item in PROVIDERS
+            if item.get("id") == name
+        ),
+        None,
+    )
+
+    if not cfg:
+        raise RuntimeError(f"{name}: fournisseur introuvable")
+
+    key_name = cfg.get("env")
+    key = os.getenv(key_name, "").strip() if key_name else ""
 
     if not key:
         raise RuntimeError(f"{name}: clé absente")
+
+    base = cfg.get("base_url") or cfg.get("base") or ""
+
+    if not base:
+        base_urls = {
+            "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "groq": "https://api.groq.com/openai/v1",
+            "mistral": "https://api.mistral.ai/v1",
+            "openrouter": "https://openrouter.ai/api/v1",
+            "cerebras": "https://api.cerebras.ai/v1",
+            "nvidia": "https://integrate.api.nvidia.com/v1",
+        }
+        base = base_urls.get(name, "")
+
+    if not base:
+        raise RuntimeError(f"{name}: URL API inconnue")
+
+    model = (
+        cfg.get("default_model")
+        or cfg.get("model")
+        or os.getenv(f"{name.upper()}_MODEL")
+    )
+
+    if not model:
+        raise RuntimeError(f"{name}: modèle inconnu")
 
     messages = []
 
     if system:
         messages.append({
             "role": "system",
-            "content": system
+            "content": system,
         })
 
     messages.append({
         "role": "user",
-        "content": prompt
+        "content": prompt,
     })
 
     headers = {
@@ -74,10 +111,10 @@ def call_openai_provider(name, prompt, system=None):
         headers["X-Title"] = "Gairus"
 
     response = requests.post(
-        cfg["base"].rstrip("/") + "/chat/completions",
+        base.rstrip("/") + "/chat/completions",
         headers=headers,
         json={
-            "model": cfg["model"],
+            "model": model,
             "messages": messages,
             "temperature": 0.2,
         },
@@ -89,7 +126,6 @@ def call_openai_provider(name, prompt, system=None):
     data = response.json()
 
     return data["choices"][0]["message"]["content"]
-
 
 def ask_provider(name, prompt, system=None):
     return call_openai_provider(
