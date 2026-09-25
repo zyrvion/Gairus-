@@ -15,6 +15,9 @@ import hmac
 import hashlib
 import time
 import threading
+from queue import Queue
+
+_GAIRUS_MISSION_QUEUE = Queue()
 
 # Une seule mission autonome SQLite à la fois.
 _MISSION_LOCK = threading.Lock()
@@ -184,14 +187,24 @@ def _run_mission_async(objective, channel, thread_ts):
             pass
 
 
-def start_mission(objective, channel, thread_ts=None):
-    thread = threading.Thread(
-        target=_run_mission_async,
-        args=(objective, channel, thread_ts),
-        daemon=True,
-    )
-    thread.start()
+def _gairus_mission_worker():
+    while True:
+        objective, channel, thread_ts = _GAIRUS_MISSION_QUEUE.get()
+        try:
+            _run_mission_async(objective, channel, thread_ts)
+        finally:
+            _GAIRUS_MISSION_QUEUE.task_done()
 
+
+def start_mission(objective, channel, thread_ts=None):
+    _GAIRUS_MISSION_QUEUE.put((objective, channel, thread_ts))
+
+
+threading.Thread(
+    target=_gairus_mission_worker,
+    daemon=True,
+    name="gairus-mission-worker",
+).start()
 
 @slack_bp.route("/events", methods=["POST"])
 def slack_events():

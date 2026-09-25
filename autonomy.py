@@ -6,6 +6,8 @@ import json
 import sqlite3
 import uuid
 import threading
+
+_GAIRUS_MISSION_LOCK = threading.RLock()
 from providers import ask_resilient
 from datetime import datetime, timezone
 
@@ -1662,9 +1664,13 @@ def create_autonomous_mission(objective):
 
 
 def autonomous_mission_cycle(mission_id):
-    """Exécute une mission puis produit directement sa réponse finale."""
-    with _MISSION_RUNTIME_LOCK:
-        return _autonomous_mission_cycle_locked(mission_id)
+    with _GAIRUS_MISSION_LOCK:
+        return _gairus_locked_mission_cycle(mission_id)
+
+def _gairus_locked_mission_cycle(mission_id):
+        """Exécute une mission puis produit directement sa réponse finale."""
+        with _MISSION_RUNTIME_LOCK:
+            return _autonomous_mission_cycle_locked(mission_id)
 
 
 def _autonomous_mission_cycle_locked(mission_id):
