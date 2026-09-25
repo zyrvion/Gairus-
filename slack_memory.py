@@ -38,6 +38,25 @@ def _db():
     conn.execute("PRAGMA synchronous=NORMAL")
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS zyrvion_knowledge (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            content TEXT NOT NULL,
+            source_channel TEXT,
+            source_ts TEXT,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL,
+            UNIQUE(category, subject)
+        )
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_zyrvion_knowledge_category
+        ON zyrvion_knowledge(category)
+    """)
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS slack_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             channel_id TEXT NOT NULL,
@@ -404,10 +423,10 @@ def search_memory(query, channel_id=None, limit=12):
         if query in haystack:
             score += 5
 
-        # Les termes projet/Sylvian gagnent du poids.
+        # Les termes projet/Zyrvion gagnent du poids.
         important = (
-            "sylvian",
-            "sylvia",
+            "zyrvion",
+            "zyrvion",
             "zyrvion",
             "gairus",
             "gaïrus",
@@ -529,6 +548,174 @@ def start_background_sync():
 
 
 # Recherche rapide depuis n'importe quel module.
+def remember_zyrvion_knowledge(
+    category,
+    subject,
+    content,
+    source_channel="",
+    source_ts="",
+):
+    category = str(category or "").strip()
+    subject = str(subject or "").strip()
+    content = str(content or "").strip()
+
+    if not category or not subject or not content:
+        return False
+
+    now = time.time()
+
+    with _MEMORY_LOCK:
+        conn = _db()
+        try:
+            conn.execute(
+                """
+                INSERT INTO zyrvion_knowledge
+                (
+                    category,
+                    subject,
+                    content,
+                    source_channel,
+                    source_ts,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(category, subject)
+                DO UPDATE SET
+                    content=excluded.content,
+                    source_channel=excluded.source_channel,
+                    source_ts=excluded.source_ts,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    category,
+                    subject,
+                    content,
+                    source_channel,
+                    source_ts,
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+
+def search_zyrvion_knowledge(query, limit=20):
+    query = str(query or "").lower().strip()
+
+    if not query:
+        return []
+
+    with _MEMORY_LOCK:
+        conn = _db()
+        try:
+            rows = conn.execute(
+                """
+                SELECT category, subject, content,
+                       source_channel, source_ts
+                FROM zyrvion_knowledge
+                ORDER BY updated_at DESC
+                LIMIT 500
+                """
+            ).fetchall()
+        finally:
+            conn.close()
+
+    words = [
+        w for w in re.findall(
+            r"[a-zA-ZÀ-ÿ0-9_'-]+",
+            query,
+        )
+        if len(w) >= 3
+    ]
+
+    results = []
+
+    for row in rows:
+        category, subject, content, channel, ts = row
+        haystack = (
+            f"{category} {subject} {content}"
+        ).lower()
+
+        score = sum(
+            1 for word in words
+            if word in haystack
+        )
+
+        if "zyrvion" in query and "zyrvion" in haystack:
+            score += 5
+
+        if score:
+            results.append(
+                (
+                    score,
+                    {
+                        "category": category,
+                        "subject": subject,
+                        "content": content,
+                        "channel": channel,
+                        "ts": ts,
+                    },
+                )
+            )
+
+    results.sort(
+        key=lambda x: x[0],
+        reverse=True,
+    )
+
+    return [
+        item[1]
+        for item in results[:limit]
+    ]
+
+
+def build_zyrvion_context(query, channel_id=None):
+    slack = build_context(
+        query,
+        channel_id=channel_id,
+        limit=12,
+    )
+
+    knowledge = search_zyrvion_knowledge(
+        query,
+        limit=20,
+    )
+
+    sections = []
+
+    if knowledge:
+        lines = [
+            "CONNAISSANCE STRUCTUREE DU PROJET ZYRVION",
+            "",
+        ]
+
+        for item in knowledge:
+            lines.append(
+                f"[{item['category']}] "
+                f"{item['subject']}: "
+                f"{item['content']}"
+            )
+
+        sections.append("\n".join(lines))
+
+    if slack:
+        sections.append(slack)
+
+    if not sections:
+        return ""
+
+    return (
+        "CONTEXTE ZYRVION POUR GAÏRUS\n"
+        "Utilise ce contexte comme mémoire de travail. "
+        "Ne fabrique jamais une information absente.\n\n"
+        + "\n\n".join(sections)
+    )
+
+
 __all__ = [
     "remember_message",
     "remember_event",
@@ -536,4 +723,7 @@ __all__ = [
     "build_context",
     "sync_all",
     "start_background_sync",
+    "remember_zyrvion_knowledge",
+    "search_zyrvion_knowledge",
+    "build_zyrvion_context",
 ]

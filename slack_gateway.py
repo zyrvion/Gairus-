@@ -18,6 +18,7 @@ import threading
 from slack_memory import (
     remember_event,
     build_context,
+    build_zyrvion_context,
     start_background_sync,
 )
 
@@ -230,10 +231,9 @@ def start_mission(objective, channel, thread_ts=None):
 
     # Récupère la mémoire Slack pertinente avant de lancer Gaïrus.
     try:
-        slack_context = build_context(
+        slack_context = build_zyrvion_context(
             objective,
             channel_id=channel,
-            limit=12,
         )
 
         if slack_context:
