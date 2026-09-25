@@ -154,7 +154,10 @@ def ask_with_fallback(prompt, system=None):
 
     for provider in order:
         try:
-            key_name = PROVIDERS[provider]["env"]
+            cfg = next((item for item in PROVIDERS if item.get("id") == provider), None)
+            if not cfg:
+                continue
+            key_name = cfg.get("env")
 
             if not os.getenv(key_name):
                 continue
@@ -168,7 +171,7 @@ def ask_with_fallback(prompt, system=None):
             if reply:
                 return {
                     "provider": provider,
-                    "model": PROVIDERS[provider]["model"],
+                    "model": cfg.get("default_model") or cfg.get("model"),
                     "reply": reply,
                     "errors": errors,
                 }
@@ -225,7 +228,7 @@ try:
     }
 
     for _provider_name in _RESILIENT_PROVIDER_NAMES:
-        if _provider_name not in PROVIDERS:
+        if not any(item.get("id") == _provider_name for item in PROVIDERS):
             continue
 
         try:
