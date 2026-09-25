@@ -677,12 +677,12 @@ def build_zyrvion_context(query, channel_id=None):
     slack = build_context(
         query,
         channel_id=channel_id,
-        limit=12,
+        limit=6,
     )
 
     knowledge = search_zyrvion_knowledge(
         query,
-        limit=20,
+        limit=6,
     )
 
     sections = []
