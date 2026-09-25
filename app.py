@@ -36,7 +36,7 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app)
 
 NAME = os.getenv("GAIRUS_NAME", "Gaïrus")
-AUTONOMY = os.getenv("GAIRUS_AUTONOMY", "false").lower() == "true"
+AUTONOMY = os.getenv("GAIRUS_AUTONOMY", "true").lower() == "true"
 APPROVALS = os.getenv("GAIRUS_APPROVALS", "true").lower() == "true"
 
 
@@ -331,17 +331,6 @@ def icon_192():
 @app.route("/icon-512.png")
 def icon_512():
     return send_from_directory("static", "icon-512.png")
-
-@app.route("/runtime-config")
-def runtime_config():
-    import os
-    return jsonify({
-        "GAIRUS_AUTONOMY": os.getenv("GAIRUS_AUTONOMY"),
-        "GAIRUS_APPROVALS": os.getenv("GAIRUS_APPROVALS"),
-        "GAIRUS_LLM_PROVIDER": os.getenv("GAIRUS_LLM_PROVIDER"),
-        "GAIRUS_LLM_MODEL": os.getenv("GAIRUS_LLM_MODEL"),
-    })
-
 
 @app.route("/health")
 def health():
