@@ -109,27 +109,29 @@ def send_message(channel, text_value, thread_ts=None):
     return slack_api("chat.postMessage", payload)
 
 
-def _run_mission_async(objective, channel, thread_ts):
+def _run_mission_async(objective, channel, thread_ts=None):
+    """
+    Exécute une mission Slack dans le même moteur pour :
+    - DM
+    - channels
+    - threads
+    - mentions
+    """
     try:
-        from autonomy import (
-            create_autonomous_mission,
-            autonomous_mission_cycle,
-        )
+        from autonomy import create_autonomous_mission, autonomous_mission_cycle
 
         mission_id = create_autonomous_mission(objective)
 
         if not mission_id:
             send_message(
                 channel,
-                "❌ Je n'ai pas pu lancer cette demande.",
+                "Je n'ai pas pu lancer cette demande.",
                 thread_ts,
             )
             return
 
         result = None
 
-        # Une mission peut attendre quelques secondes si le moteur
-        # autonome travaille déjà sur une autre mission.
         for attempt in range(4):
             try:
                 result = autonomous_mission_cycle(mission_id)
@@ -155,26 +157,42 @@ def _run_mission_async(objective, channel, thread_ts):
                     continue
                 raise
 
-        if isinstance(result, dict) and result.get("ok"):
-            reply = str(result.get("reply") or "").strip()
+        if isinstance(result, dict):
+            if result.get("ok"):
+                reply = str(result.get("reply") or "").strip()
 
-            if reply:
-                send_message(channel, reply, thread_ts)
-            else:
-                send_message(
-                    channel,
-                    "J'ai terminé, mais je n'ai pas obtenu de résultat exploitable.",
-                    thread_ts,
-                )
+                if reply:
+                    send_message(channel, reply, thread_ts)
+                else:
+                    send_message(
+                        channel,
+                        "Mission terminée.",
+                        thread_ts,
+                    )
+                return
+
+            error = str(
+                result.get("error")
+                or "Je n'ai pas pu terminer cette demande."
+            ).strip()
+
+            send_message(
+                channel,
+                f"⚠️ {error}",
+                thread_ts,
+            )
             return
 
-        error = "Je n'ai pas pu terminer cette demande."
-        if isinstance(result, dict) and result.get("error"):
-            detail = str(result["error"]).strip()
-            if detail:
-                error = f"{error}\n\nDétail : {detail}"
+        reply = str(result or "").strip()
 
-        send_message(channel, f"⚠️ {error}", thread_ts)
+        if reply:
+            send_message(channel, reply, thread_ts)
+        else:
+            send_message(
+                channel,
+                "Mission terminée.",
+                thread_ts,
+            )
 
     except Exception as exc:
         try:
@@ -192,19 +210,33 @@ def _gairus_mission_worker():
         objective, channel, thread_ts = _GAIRUS_MISSION_QUEUE.get()
         try:
             _run_mission_async(objective, channel, thread_ts)
+        except Exception:
+            pass
         finally:
             _GAIRUS_MISSION_QUEUE.task_done()
 
 
 def start_mission(objective, channel, thread_ts=None):
-    _GAIRUS_MISSION_QUEUE.put((objective, channel, thread_ts))
+    objective = str(objective or "").strip()
+
+    if not objective or not channel:
+        return
+
+    _GAIRUS_MISSION_QUEUE.put(
+        (objective, channel, thread_ts)
+    )
 
 
-threading.Thread(
-    target=_gairus_mission_worker,
-    daemon=True,
-    name="gairus-mission-worker",
-).start()
+if not any(
+    t.name == "gairus-mission-worker"
+    for t in threading.enumerate()
+):
+    threading.Thread(
+        target=_gairus_mission_worker,
+        name="gairus-mission-worker",
+        daemon=True,
+    ).start()
+
 
 @slack_bp.route("/events", methods=["POST"])
 def slack_events():
