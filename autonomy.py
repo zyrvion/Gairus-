@@ -1593,7 +1593,30 @@ def autonomous_plan_mission(mission_id):
         raise ValueError("Mission introuvable")
 
     objective = mission["objective"]
-    result = ai_plan_mission(objective)
+
+    # Autorise le planificateur à construire des actions de modification
+    # du code lorsque l'utilisateur le demande explicitement.
+    planning_objective = objective
+
+    if any(word in objective.lower() for word in (
+        "modifie ton code",
+        "modifie ton propre code",
+        "améliore ton code",
+        "ameliore ton code",
+        "corrige ton code",
+        "fais évoluer ton code",
+        "fais evoluer ton code",
+        "auto-modification",
+        "auto modification",
+    )):
+        planning_objective = (
+            f"{objective}\n\n"
+            f"{SELF_MODIFICATION_INSTRUCTION}\n\n"
+            "OUTILS DISPONIBLES POUR CETTE MISSION : "
+            + ", ".join(sorted(SELF_MODIFICATION_TOOLS))
+        )
+
+    result = ai_plan_mission(planning_objective)
 
     reply = result.get("reply", "") if isinstance(result, dict) else str(result)
 
