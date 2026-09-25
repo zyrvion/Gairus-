@@ -1121,6 +1121,18 @@ TOOL_REGISTRY = {
 TOOL_REGISTRY.update(SELF_CODE_REGISTRY)
 
 
+# Outils de modification du code de Gaïrus.
+# Ils restent limités au workspace du projet et doivent être testés
+# avant toute validation Git.
+SELF_MODIFICATION_TOOLS = {
+    "read_code",
+    "write_code",
+    "run_python_test",
+    "self_repair",
+    "git_diff",
+    "git_commit",
+}
+
 APPROVAL_REQUIRED_TOOLS = {
     "http_get",
 }
