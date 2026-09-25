@@ -89,10 +89,46 @@ def git_commit(message: str) -> str:
     return result.stdout.strip()
 
 
+def self_repair(path: str, attempts: int = 3) -> str:
+    """
+    Vérifie un fichier Python et retourne un diagnostic exploitable
+    par Gaïrus pour effectuer une nouvelle correction.
+    """
+    target = _safe_path(path)
+
+    if not target.exists():
+        raise FileNotFoundError(path)
+
+    errors = []
+
+    for attempt in range(1, int(attempts) + 1):
+        result = subprocess.run(
+            ["python", "-m", "py_compile", str(target)],
+            cwd=WORKSPACE,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        if result.returncode == 0:
+            return f"AUTO-REPAIR OK après {attempt} tentative(s)."
+
+        error = (
+            result.stderr.strip()
+            or result.stdout.strip()
+            or "Erreur Python inconnue."
+        )
+
+        errors.append(f"Tentative {attempt}: {error}")
+
+    return "\n".join(errors)
+
+
 REGISTRY = {
     "read_code": read_code,
     "write_code": write_code,
     "run_python_test": run_python_test,
     "git_diff": git_diff,
     "git_commit": git_commit,
+    "self_repair": self_repair,
 }
