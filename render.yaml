@@ -15,6 +15,6 @@ services:
       - key: GAIRUS_APPROVALS
         value: "true"
       - key: GAIRUS_LLM_PROVIDER
-        value: openrouter
+        value: auto
       - key: GAIRUS_LLM_MODEL
-        value: openrouter/free
+        value: auto
