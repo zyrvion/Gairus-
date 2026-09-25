@@ -15,6 +15,12 @@ import hmac
 import hashlib
 import time
 import threading
+from slack_memory import (
+    remember_event,
+    build_context,
+    start_background_sync,
+)
+
 from queue import Queue
 
 _GAIRUS_MISSION_QUEUE = Queue()
@@ -221,6 +227,22 @@ def start_mission(objective, channel, thread_ts=None):
 
     if not objective or not channel:
         return
+
+    # Récupère la mémoire Slack pertinente avant de lancer Gaïrus.
+    try:
+        slack_context = build_context(
+            objective,
+            channel_id=channel,
+            limit=12,
+        )
+
+        if slack_context:
+            objective = (
+                f"{objective}\n\n"
+                f"{slack_context}"
+            )
+    except Exception:
+        pass
 
     _GAIRUS_MISSION_QUEUE.put(
         (objective, channel, thread_ts)
@@ -579,3 +601,12 @@ def process_gairus_slack_message(
 
 # === END GAIRUS_AGENT_BRIDGE ===
 
+
+
+# ============================================================
+# GAÏRUS : mémoire Slack persistante
+# ============================================================
+try:
+    start_background_sync()
+except Exception:
+    pass
