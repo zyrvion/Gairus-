@@ -169,48 +169,59 @@ try:
             system=system,
         )
 
-    # Fournisseurs disponibles dans providers.py.
-    #
-    # Les priorités sont volontairement configurables par
-    # l'ordre et pourront être affinées ensuite.
+    # Fournisseurs réellement définis dans PROVIDERS.
     _RESILIENT_PROVIDER_NAMES = [
         "gemini",
+        "groq",
         "openrouter",
-        "kimi",
+        "mistral",
+        "cerebras",
+        "nvidia",
     ]
 
+    _RESILIENT_PRIORITIES = {
+        "gemini": 10,
+        "groq": 20,
+        "openrouter": 30,
+        "mistral": 40,
+        "cerebras": 50,
+        "nvidia": 60,
+    }
+
     for _provider_name in _RESILIENT_PROVIDER_NAMES:
+        if _provider_name not in PROVIDERS:
+            continue
+
         try:
             register_provider(
                 name=_provider_name,
-                handler=lambda prompt, system=None,
-                _name=_provider_name: _resilient_existing_provider(
-                    _name,
-                    prompt,
-                    system,
-                ),
+                handler=lambda prompt, system=None, _name=_provider_name:
+                    _resilient_existing_provider(
+                        _name,
+                        prompt,
+                        system,
+                    ),
                 capabilities={"text", "reasoning"},
-                priority={
-                    "gemini": 10,
-                    "kimi": 20,
-                    "openrouter": 30,
-                }.get(_provider_name, 100),
+                priority=_RESILIENT_PRIORITIES.get(
+                    _provider_name,
+                    100,
+                ),
                 timeout=float(
                     os.getenv(
                         "GAIRUS_PROVIDER_TIMEOUT",
-                        "45",
+                        "60",
                     )
                 ),
                 max_retries=int(
                     os.getenv(
                         "GAIRUS_PROVIDER_RETRIES",
-                        "2",
+                        "1",
                     )
                 ),
                 cooldown=float(
                     os.getenv(
                         "GAIRUS_PROVIDER_COOLDOWN",
-                        "30",
+                        "20",
                     )
                 ),
             )
