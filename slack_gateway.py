@@ -260,6 +260,36 @@ def start_slack_socket_mode():
     try:
         bolt_app = SlackBoltApp(token=bot_token)
 
+        @bolt_app.event("message")
+        def handle_message_events(body, event, say, logger):
+            try:
+                if event.get("bot_id") or event.get("subtype"):
+                    return
+
+                text_value = event.get("text", "").strip()
+                channel = event.get("channel")
+                ts = event.get("ts")
+
+                if not text_value or not channel:
+                    return
+
+                say(
+                    text=f"🧠 Gaïrus reçoit : {text_value}",
+                    thread_ts=ts,
+                )
+
+                start_mission(text_value, channel, ts)
+
+            except Exception as exc:
+                logger.exception("[GAIRUS][SLACK] Erreur message")
+                try:
+                    say(
+                        text=f"⚠️ Erreur Gaïrus : `{exc}`",
+                        thread_ts=event.get("ts"),
+                    )
+                except Exception:
+                    pass
+
         @bolt_app.event("app_mention")
         def handle_app_mention(body, event, say, logger):
             try:
