@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 DB_PATH = os.getenv("GAIRUS_DB", "data/gairus.db")
 
 _ENGINE_LOCK = threading.Lock()
+_MISSION_RUNTIME_LOCK = threading.RLock()
 
 
 def now():
@@ -1304,8 +1305,15 @@ def autonomous_runtime_cycle():
     2. planifie celles sans tâches
     3. exécute les actions disponibles
     4. met à jour les statuts
+
+    Le moteur global partage le même verrou que les missions Slack.
     """
 
+    with _MISSION_RUNTIME_LOCK:
+        return _autonomous_runtime_cycle_locked()
+
+
+def _autonomous_runtime_cycle_locked():
     results = []
 
     conn = db()
@@ -1655,6 +1663,11 @@ def create_autonomous_mission(objective):
 
 def autonomous_mission_cycle(mission_id):
     """Exécute une mission puis produit directement sa réponse finale."""
+    with _MISSION_RUNTIME_LOCK:
+        return _autonomous_mission_cycle_locked(mission_id)
+
+
+def _autonomous_mission_cycle_locked(mission_id):
     mission_id = str(mission_id or "").strip()
 
     if not mission_id:

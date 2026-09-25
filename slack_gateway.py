@@ -107,16 +107,10 @@ def send_message(channel, text_value, thread_ts=None):
 
 
 def _run_mission_async(objective, channel, thread_ts):
-    """Exécute une mission Slack sans exposer les détails internes."""
     try:
-        from autonomy import create_autonomous_mission
-        from autonomy import autonomous_mission_cycle
-
-        # Réponse immédiate : l'utilisateur sait que Gaïrus travaille.
-        send_message(
-            channel,
-            "",
-            thread_ts,
+        from autonomy import (
+            create_autonomous_mission,
+            autonomous_mission_cycle,
         )
 
         mission_id = create_autonomous_mission(objective)
@@ -124,13 +118,39 @@ def _run_mission_async(objective, channel, thread_ts):
         if not mission_id:
             send_message(
                 channel,
-                "❌ Je n'ai pas réussi à lancer cette demande.",
+                "❌ Je n'ai pas pu lancer cette demande.",
                 thread_ts,
             )
             return
 
-        with _MISSION_LOCK:
-            result = autonomous_mission_cycle(mission_id)
+        result = None
+
+        # Une mission peut attendre quelques secondes si le moteur
+        # autonome travaille déjà sur une autre mission.
+        for attempt in range(4):
+            try:
+                result = autonomous_mission_cycle(mission_id)
+
+                if (
+                    isinstance(result, dict)
+                    and "database is locked" in str(
+                        result.get("error", "")
+                    ).lower()
+                    and attempt < 3
+                ):
+                    time.sleep(2 ** attempt)
+                    continue
+
+                break
+
+            except Exception as exc:
+                if (
+                    "database is locked" in str(exc).lower()
+                    and attempt < 3
+                ):
+                    time.sleep(2 ** attempt)
+                    continue
+                raise
 
         if isinstance(result, dict) and result.get("ok"):
             reply = str(result.get("reply") or "").strip()
@@ -140,14 +160,16 @@ def _run_mission_async(objective, channel, thread_ts):
             else:
                 send_message(
                     channel,
-                    "✅ J'ai terminé, mais je n'ai pas obtenu de résultat exploitable.",
+                    "J'ai terminé, mais je n'ai pas obtenu de résultat exploitable.",
                     thread_ts,
                 )
             return
 
         error = "Je n'ai pas pu terminer cette demande."
         if isinstance(result, dict) and result.get("error"):
-            error = f"{error}\n\nDétail : {result['error']}"
+            detail = str(result["error"]).strip()
+            if detail:
+                error = f"{error}\n\nDétail : {detail}"
 
         send_message(channel, f"⚠️ {error}", thread_ts)
 
@@ -160,6 +182,7 @@ def _run_mission_async(objective, channel, thread_ts):
             )
         except Exception:
             pass
+
 
 def start_mission(objective, channel, thread_ts=None):
     thread = threading.Thread(
@@ -226,7 +249,7 @@ def slack_command():
                     response_url,
                     json={
                         "response_type": "in_channel",
-                        "text": f"🧠 Gaïrus reçoit : {text_value}",
+                        "text": "Bien reçu.",
                     },
                     timeout=10,
                 )
@@ -280,6 +303,11 @@ def start_slack_socket_mode():
         def handle_message_events(body, event, say, logger):
             try:
                 if event.get("bot_id") or event.get("subtype"):
+                    return
+
+                # Les messages de canaux sont gérés par app_mention.
+                # Ici on ne traite que les conversations directes.
+                if event.get("channel_type") not in ("im", "mpim"):
                     return
 
                 text_value = event.get("text", "").strip()
