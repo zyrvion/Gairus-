@@ -286,7 +286,7 @@ def start_slack_socket_mode():
                     return
 
                 say(
-                    text="Bien reçu. Je m’occupe de ça.",
+                    text="Bien reçu.",
                     thread_ts=ts,
                 )
 
@@ -325,7 +325,7 @@ def start_slack_socket_mode():
                     return
 
                 say(
-                    text="Bien reçu. Je m’occupe de ça.",
+                    text="Bien reçu.",
                     thread_ts=ts,
                 )
 
@@ -358,7 +358,7 @@ def start_slack_socket_mode():
 
                 respond(
                     response_type="in_channel",
-                    text="Bien reçu. Je m’occupe de ça.",
+                    text="Bien reçu.",
                 )
 
                 start_mission(text_value, channel)
