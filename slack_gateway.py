@@ -287,7 +287,7 @@ def start_slack_socket_mode():
                     thread_ts=ts,
                 )
 
-                # start_mission(objective, channel, ts)  # TEST RAPIDITE
+                start_mission(objective, channel, ts)
 
             except Exception as exc:
                 logger.exception("[GAIRUS][SLACK] Erreur app_mention")
