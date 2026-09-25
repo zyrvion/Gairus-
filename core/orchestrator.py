@@ -5,18 +5,21 @@ from .executor import Executor
 from .verifier import Verifier
 from .mission_engine import MissionEngine
 from .task_graph import TaskGraph
-from security.audit import AuditLog
+from security.audit import AuditLogger
 
 
 class GairusOrchestrator:
     def __init__(self):
+        from core.company_controller import CompanyController
+
+        self.company_controller = CompanyController()
         self.permissions = PermissionManager()
         self.planner = Planner()
         self.router = ModelRouter()
         self.executor = Executor(self.permissions, enterprise=self.company_controller.enterprise, controller=self.company_controller)
         self.verifier = Verifier()
         self.missions = MissionEngine()
-        self.audit = AuditLog()
+        self.audit = AuditLogger()
 
     def run(self, objective, complexity="auto"):
         mission = self.missions.create(
@@ -24,9 +27,9 @@ class GairusOrchestrator:
             complexity
         )
 
-        self.audit.record(
-            "mission_created",
-            mission
+        self.audit.log(
+            event="mission_created",
+            metadata=mission,
         )
 
         graph = TaskGraph()
@@ -72,12 +75,10 @@ class GairusOrchestrator:
         mission["verification"] = verification
         mission["task_graph"] = graph.nodes
 
-        self.audit.record(
-            "mission_finished",
-            {
-                "mission_id": mission["id"],
-                "status": mission["status"],
-            }
+        self.audit.log(
+            event="mission_finished",
+            mission_id=mission["id"],
+            status=mission["status"],
         )
 
         return mission

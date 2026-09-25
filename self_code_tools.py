@@ -67,16 +67,38 @@ def git_diff() -> str:
     return result.stdout.strip() or "Aucune modification."
 
 
-def git_commit(message: str) -> str:
+def git_commit(message: str, paths=None) -> str:
+    """
+    Crée un commit uniquement avec les fichiers explicitement indiqués.
+    Aucun git add -A afin d'éviter d'embarquer des modifications étrangères.
+    """
+    if paths is None:
+        raise ValueError(
+            "git_commit exige la liste explicite des fichiers à valider."
+        )
+
+    if isinstance(paths, str):
+        paths = [paths]
+
+    safe_paths = []
+    for path in paths:
+        target = _safe_path(path)
+        if not target.exists():
+            raise FileNotFoundError(path)
+        safe_paths.append(str(target.relative_to(WORKSPACE)))
+
+    if not safe_paths:
+        raise ValueError("Aucun fichier à valider.")
+
     subprocess.run(
-        ["git", "add", "-A"],
+        ["git", "add", "--", *safe_paths],
         cwd=WORKSPACE,
         check=True,
         timeout=30,
     )
 
     result = subprocess.run(
-        ["git", "commit", "-m", str(message)],
+        ["git", "commit", "-m", str(message), "--", *safe_paths],
         cwd=WORKSPACE,
         capture_output=True,
         text=True,
@@ -87,7 +109,6 @@ def git_commit(message: str) -> str:
         return result.stdout.strip() or result.stderr.strip()
 
     return result.stdout.strip()
-
 
 def self_repair(path: str, attempts: int = 3) -> str:
     """
