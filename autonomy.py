@@ -1595,7 +1595,9 @@ Règles :
 - Pour modifier un fichier, utilise write_code avec {{"path": "...",
   "content": "..."}}.
 - Pour réparer une erreur Python, utilise self_repair avec {{"path": "..."}}.
-- Pour inspecter les changements, utilise git_diff.
+- Pour inspecter les changements, utilise git_diff avec {{"paths": ["..."]}}.
+- git_diff DOIT recevoir les mêmes fichiers concernés par la modification.
+- Ne crée jamais de git_diff sans paths explicites.
 - Pour créer un commit, utilise git_commit avec {{"message": "...",
   "paths": ["..."]}}. Ne crée jamais de git_commit sans paths explicites.
 - Les paramètres doivent être directement utilisables par l'outil.

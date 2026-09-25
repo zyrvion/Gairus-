@@ -55,9 +55,31 @@ def run_python_test(path: str) -> str:
     return f"TEST OK : {target.relative_to(WORKSPACE)}"
 
 
-def git_diff() -> str:
+def git_diff(paths=None) -> str:
+    """
+    Inspecte uniquement les fichiers explicitement indiqués.
+    Aucun git diff global afin d'éviter de mélanger des modifications étrangères.
+    """
+    if paths is None:
+        raise ValueError(
+            "git_diff exige la liste explicite des fichiers à inspecter."
+        )
+
+    if isinstance(paths, str):
+        paths = [paths]
+
+    safe_paths = []
+    for path in paths:
+        target = _safe_path(path)
+        if not target.exists():
+            raise FileNotFoundError(path)
+        safe_paths.append(str(target.relative_to(WORKSPACE)))
+
+    if not safe_paths:
+        raise ValueError("Aucun fichier à inspecter.")
+
     result = subprocess.run(
-        ["git", "diff", "--stat"],
+        ["git", "diff", "--stat", "--", *safe_paths],
         cwd=WORKSPACE,
         capture_output=True,
         text=True,
@@ -65,6 +87,7 @@ def git_diff() -> str:
     )
 
     return result.stdout.strip() or "Aucune modification."
+
 
 
 def git_commit(message: str, paths=None) -> str:
