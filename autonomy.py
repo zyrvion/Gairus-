@@ -1488,47 +1488,75 @@ def runtime_status():
 # ============================================================
 
 def ai_plan_mission(prompt):
-    """Construit un plan de mission à partir de l'objectif."""
-    result = ask_resilient(
-        prompt,
-        system=(
-            "Tu es le planificateur autonome de Gaïrus. "
-            "Transforme l'objectif en tâches concrètes. "
-            "Réponds uniquement avec un JSON valide au format: "
-            '{"tasks":[{"title":"...","description":"...",'
-            '"priority":1,"tool":"none","requires_approval":false,'
-            '"parameters":{}}]}'
-        ),
-    )
-    return result
+    """Construit un plan autonome exploitable par le moteur Gaïrus."""
+    try:
+        import tools
+        available_tools = tools.list_tools_for_model()
+    except Exception:
+        available_tools = "Aucun outil externe disponible."
 
+    system = f"""
+Tu es le planificateur autonome de Gaïrus.
+
+Ton travail est de transformer l'objectif utilisateur en actions réellement
+exécutables.
+
+Outils disponibles :
+{available_tools}
+
+Retourne UNIQUEMENT un JSON valide :
+{{
+  "tasks": [
+    {{
+      "title": "titre court",
+      "description": "description précise",
+      "priority": 1,
+      "tool": "nom_exact_de_l_outil",
+      "requires_approval": false,
+      "parameters": {{}}
+    }}
+  ]
+}}
+
+Règles :
+- Comprends l'objectif avant de choisir les actions.
+- 1 à 10 tâches maximum.
+- Chaque tâche doit être concrète.
+- Utilise un outil disponible lorsque cela permet réellement d'accomplir
+  la demande.
+- Utilise "none" uniquement lorsqu'aucun outil n'est nécessaire.
+- Les paramètres doivent être directement utilisables par l'outil.
+- Ne prétends jamais qu'une action a déjà été exécutée.
+- Ne produis aucun raisonnement, uniquement le JSON.
+"""
+
+    return ask_resilient(prompt, system=system)
 
 def autonomous_plan_mission(mission_id):
-    """Planifie une mission existante."""
+    """Transforme une mission en tâches ET actions réellement exécutables."""
     with db() as conn:
-        row = conn.execute(
+        mission = conn.execute(
             "SELECT * FROM autonomy_missions WHERE mission_id=?",
             (mission_id,),
         ).fetchone()
 
-    if not row:
+    if not mission:
         raise ValueError("Mission introuvable")
 
-    objective = row["objective"]
+    objective = mission["objective"]
     result = ai_plan_mission(objective)
 
     reply = result.get("reply", "") if isinstance(result, dict) else str(result)
 
-    import json
-    import re
-
     try:
         match = re.search(r"\{.*\}", reply, re.S)
         plan = json.loads(match.group(0) if match else reply)
+        if not isinstance(plan, dict):
+            raise ValueError("Plan invalide")
     except Exception:
         plan = {
             "tasks": [{
-                "title": "Exécuter l'objectif",
+                "title": "Répondre à la demande",
                 "description": objective,
                 "priority": 1,
                 "tool": "none",
@@ -1538,21 +1566,52 @@ def autonomous_plan_mission(mission_id):
         }
 
     tasks = plan.get("tasks", [])
+    created = []
 
-    for item in tasks:
-        create_task(
+    for item in tasks[:10]:
+        title = str(item.get("title") or "Tâche").strip()
+        description = str(item.get("description") or "").strip()
+        priority = int(item.get("priority") or 5)
+
+        task_id = create_task(
             mission_id=mission_id,
-            title=str(item.get("title", "Tâche")),
-            description=str(item.get("description", "")),
-            priority=int(item.get("priority", 5)),
+            title=title,
+            description=description,
+            priority=priority,
             depends_on=item.get("depends_on"),
         )
 
+        tool = str(item.get("tool") or "none").strip()
+        parameters = item.get("parameters") or {}
+        requires_approval = bool(item.get("requires_approval", False))
+
+        action_id = None
+
+        if tool and tool != "none":
+            action_id = create_action(
+                task_id=task_id,
+                tool=tool,
+                parameters=parameters,
+                requires_approval=requires_approval,
+            )
+
+        created.append({
+            "task_id": task_id,
+            "action_id": action_id,
+            "title": title,
+            "tool": tool,
+        })
+
     with db() as conn:
         conn.execute(
-            "UPDATE autonomy_missions SET status=?, plan=?, updated_at=? "
-            "WHERE mission_id=?",
-            ("planned", json.dumps(plan, ensure_ascii=False), now(), mission_id),
+            """
+            UPDATE autonomy_missions
+            SET status='planned',
+                plan=?,
+                updated_at=?
+            WHERE mission_id=?
+            """,
+            (json.dumps(plan, ensure_ascii=False), now(), mission_id),
         )
         conn.commit()
 
@@ -1560,13 +1619,15 @@ def autonomous_plan_mission(mission_id):
         mission_id,
         None,
         None,
-        "mission_planned",
+        "mission.planned",
         "Plan autonome créé",
-        plan,
+        {"tasks": created},
     )
 
-    return plan
-
+    return {
+        "ok": True,
+        "tasks": created,
+    }
 
 def create_autonomous_mission(objective):
     """Crée puis planifie une mission autonome."""
@@ -1586,15 +1647,11 @@ def create_autonomous_mission(objective):
 
 
 def autonomous_mission_cycle(mission_id):
-    """Exécute un cycle autonome pour une mission précise."""
-
+    """Exécute une mission puis produit directement sa réponse finale."""
     mission_id = str(mission_id or "").strip()
 
     if not mission_id:
-        return {
-            "ok": False,
-            "error": "mission_id requis",
-        }
+        return {"ok": False, "error": "mission_id requis"}
 
     with db() as conn:
         mission = conn.execute(
@@ -1606,21 +1663,167 @@ def autonomous_mission_cycle(mission_id):
         return {
             "ok": False,
             "error": "Mission introuvable",
-            "mission_id": mission_id,
         }
 
     try:
-        result = run_cycle()
+        import tools
 
-        if isinstance(result, dict):
-            result.setdefault("ok", True)
-            result.setdefault("mission_id", mission_id)
-            return result
+        registry = {}
+
+        # Outils natifs de l'autonomie.
+        for name, fn in TOOL_REGISTRY.items():
+            registry[name] = ("native", fn)
+
+        # Outils généraux de Gaïrus.
+        for name, spec in getattr(tools, "REGISTRY", {}).items():
+            registry[name] = ("general", spec["fn"])
+
+        results = []
+
+        for action in get_pending_actions():
+            # Ne traite que les actions appartenant à cette mission.
+            with db() as conn:
+                task = conn.execute(
+                    "SELECT mission_id FROM autonomy_tasks WHERE task_id=?",
+                    (action["task_id"],),
+                ).fetchone()
+
+            if not task or task["mission_id"] != mission_id:
+                continue
+
+            if action["status"] == "waiting_approval":
+                results.append({
+                    "ok": False,
+                    "error": "Approbation requise",
+                    "action_id": action["action_id"],
+                })
+                continue
+
+            tool_name = str(action["tool"] or "none")
+            parameters = json.loads(action["parameters"] or "{}")
+
+            update_status(
+                "autonomy_actions",
+                action["action_id"],
+                action["action_id"],
+                "running",
+            )
+
+            try:
+                if tool_name not in registry:
+                    raise RuntimeError(f"Outil non disponible : {tool_name}")
+
+                kind, fn = registry[tool_name]
+
+                if kind == "native":
+                    value = fn(parameters or {})
+                else:
+                    value = fn(**(parameters or {}))
+
+                with db() as conn:
+                    conn.execute(
+                        """
+                        UPDATE autonomy_actions
+                        SET status='completed',
+                            result=?,
+                            updated_at=?
+                        WHERE action_id=?
+                        """,
+                        (
+                            json.dumps(
+                                value,
+                                ensure_ascii=False,
+                                default=str,
+                            ),
+                            now(),
+                            action["action_id"],
+                        ),
+                    )
+                    conn.commit()
+
+                refresh_task_status(action["task_id"])
+
+                results.append({
+                    "ok": True,
+                    "tool": tool_name,
+                    "result": value,
+                })
+
+            except Exception as exc:
+                with db() as conn:
+                    conn.execute(
+                        """
+                        UPDATE autonomy_actions
+                        SET status='failed',
+                            error=?,
+                            updated_at=?
+                        WHERE action_id=?
+                        """,
+                        (
+                            str(exc),
+                            now(),
+                            action["action_id"],
+                        ),
+                    )
+                    conn.commit()
+
+                refresh_task_status(action["task_id"])
+
+                results.append({
+                    "ok": False,
+                    "tool": tool_name,
+                    "error": str(exc),
+                })
+
+        refresh_mission_status(mission_id)
+
+        # Synthèse finale destinée à l'utilisateur.
+        execution_context = json.dumps(
+            results,
+            ensure_ascii=False,
+            default=str,
+        )[:12000]
+
+        final = ask_resilient(
+            f"""
+Objectif utilisateur :
+{mission["objective"]}
+
+Résultats réels des actions exécutées :
+{execution_context}
+
+Donne maintenant la réponse finale à l'utilisateur.
+
+Règles :
+- Réponds directement à sa demande.
+- Ne parle jamais de mission_id.
+- Ne parle pas de ton raisonnement interne.
+- Ne montre pas de JSON, de logs ou de traces techniques.
+- Ne prétends pas qu'une action a réussi si elle a échoué.
+- Si des informations ont réellement été trouvées, présente-les clairement.
+- Si aucune action n'était nécessaire, réponds directement à l'objectif.
+- Réponds comme un collègue compétent dans Slack.
+""",
+            system=(
+                "Tu es Gaïrus. Tu produis uniquement la réponse finale "
+                "destinée à l'utilisateur. Aucun raisonnement interne, "
+                "aucun log, aucun JSON technique."
+            ),
+        )
+
+        reply = (
+            final.get("reply", "")
+            if isinstance(final, dict)
+            else str(final)
+        ).strip()
+
+        if not reply:
+            reply = "J'ai terminé le traitement, mais je n'ai pas obtenu de résultat exploitable."
 
         return {
             "ok": True,
-            "mission_id": mission_id,
-            "result": result,
+            "reply": reply,
+            "results": results,
         }
 
     except Exception as exc:
@@ -1635,8 +1838,6 @@ def autonomous_mission_cycle(mission_id):
 
         return {
             "ok": False,
-            "mission_id": mission_id,
             "error": str(exc),
         }
-
 

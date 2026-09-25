@@ -104,46 +104,58 @@ def send_message(channel, text_value, thread_ts=None):
 
 
 def _run_mission_async(objective, channel, thread_ts):
+    """Exécute une mission Slack sans exposer les détails internes."""
     try:
         from autonomy import create_autonomous_mission
         from autonomy import autonomous_mission_cycle
+
+        # Réponse immédiate : l'utilisateur sait que Gaïrus travaille.
+        send_message(
+            channel,
+            "🧠 Je m'en occupe. Je vais traiter ta demande et revenir avec le résultat.",
+            thread_ts,
+        )
 
         mission_id = create_autonomous_mission(objective)
 
         if not mission_id:
             send_message(
                 channel,
-                "❌ Gaïrus n'a pas pu créer la mission.",
+                "❌ Je n'ai pas réussi à lancer cette demande.",
                 thread_ts,
             )
             return
 
-        send_message(
-            channel,
-            f"🧠 Mission créée : `{mission_id}`\n"
-            f"Je commence le travail sur : {objective}",
-            thread_ts,
-        )
-
         result = autonomous_mission_cycle(mission_id)
 
-        send_message(
-            channel,
-            "✅ Cycle Gaïrus terminé.\n\n"
-            f"```{str(result)[:5000]}```",
-            thread_ts,
-        )
+        if isinstance(result, dict) and result.get("ok"):
+            reply = str(result.get("reply") or "").strip()
+
+            if reply:
+                send_message(channel, reply, thread_ts)
+            else:
+                send_message(
+                    channel,
+                    "✅ J'ai terminé, mais je n'ai pas obtenu de résultat exploitable.",
+                    thread_ts,
+                )
+            return
+
+        error = "Je n'ai pas pu terminer cette demande."
+        if isinstance(result, dict) and result.get("error"):
+            error = f"{error}\n\nDétail : {result['error']}"
+
+        send_message(channel, f"⚠️ {error}", thread_ts)
 
     except Exception as exc:
         try:
             send_message(
                 channel,
-                f"⚠️ Erreur pendant la mission : `{exc}`",
+                f"⚠️ Je n'ai pas pu terminer cette demande : {exc}",
                 thread_ts,
             )
         except Exception:
             pass
-
 
 def start_mission(objective, channel, thread_ts=None):
     thread = threading.Thread(
