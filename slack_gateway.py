@@ -125,6 +125,24 @@ def _run_mission_async(objective, channel, thread_ts=None):
     - mentions
     """
     try:
+        # Le contexte mémoire est construit hors du listener Slack.
+        try:
+            slack_context = build_zyrvion_context(
+                objective,
+                channel_id=channel,
+            )
+
+            if slack_context:
+                objective = (
+                    f"{objective}\n\n"
+                    f"{slack_context}"
+                )
+        except Exception as context_exc:
+            print(
+                f"[GAIRUS][SLACK] Contexte mémoire indisponible : {context_exc}",
+                flush=True,
+            )
+
         from autonomy import create_autonomous_mission, autonomous_mission_cycle
 
         mission_id = create_autonomous_mission(objective)
@@ -213,40 +231,45 @@ def _run_mission_async(objective, channel, thread_ts=None):
 
 
 def _gairus_mission_worker():
+    """
+    Worker Slack non bloquant.
+    Chaque mission est déléguée à son propre thread afin qu'une mission
+    longue ou bloquée ne puisse empêcher les messages Slack suivants.
+    """
     while True:
         objective, channel, thread_ts = _GAIRUS_MISSION_QUEUE.get()
+
         try:
-            _run_mission_async(objective, channel, thread_ts)
-        except Exception:
-            pass
+            threading.Thread(
+                target=_run_mission_async,
+                args=(objective, channel, thread_ts),
+                name="gairus-mission-execution",
+                daemon=True,
+            ).start()
+        except Exception as exc:
+            print(
+                f"[GAIRUS][SLACK] Impossible de lancer la mission : {exc}",
+                flush=True,
+            )
         finally:
             _GAIRUS_MISSION_QUEUE.task_done()
 
 
 def start_mission(objective, channel, thread_ts=None):
+    """
+    Met une mission en file sans effectuer de travail bloquant dans le
+    handler Slack.
+    """
     objective = str(objective or "").strip()
 
     if not objective or not channel:
-        return
-
-    # Récupère la mémoire Slack pertinente avant de lancer Gaïrus.
-    try:
-        slack_context = build_zyrvion_context(
-            objective,
-            channel_id=channel,
-        )
-
-        if slack_context:
-            objective = (
-                f"{objective}\n\n"
-                f"{slack_context}"
-            )
-    except Exception:
-        pass
+        return False
 
     _GAIRUS_MISSION_QUEUE.put(
         (objective, channel, thread_ts)
     )
+
+    return True
 
 
 if not any(
@@ -384,10 +407,30 @@ def start_slack_socket_mode():
                 if not text_value or not channel:
                     return
 
+
+                normalized = text_value.lower().strip()
+
+                if normalized in {
+                    "tu es là",
+                    "tu es la",
+                    "tu es là ?",
+                    "tu es la ?",
+                    "tu es là?",
+                    "tu es la?",
+                    "gaïrus",
+                    "gairus",
+                }:
+                    say(
+                        text="Oui, je suis là. Que veux-tu que je fasse ?",
+                        thread_ts=ts,
+                    )
+                    return
+
                 say(
                     text="Bien reçu.",
                     thread_ts=ts,
                 )
+
 
                 start_mission(text_value, channel, ts)
 
