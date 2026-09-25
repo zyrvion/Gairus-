@@ -1133,6 +1133,23 @@ SELF_MODIFICATION_TOOLS = {
     "git_commit",
 }
 
+SELF_MODIFICATION_INSTRUCTION = """
+Lorsque l'utilisateur demande explicitement à Gaïrus de modifier,
+améliorer, corriger ou faire évoluer son propre code :
+
+1. Utilise read_code pour examiner le code concerné.
+2. Utilise write_code pour appliquer la modification.
+3. Utilise run_python_test pour vérifier la syntaxe.
+4. Si le test échoue, utilise self_repair et corrige le problème.
+5. Utilise git_diff pour vérifier précisément les changements.
+6. Ne valide jamais une modification non testée.
+7. Utilise git_commit uniquement après validation.
+8. Reste dans le workspace du projet.
+9. Ne modifie jamais les secrets ou identifiants sans autorisation explicite.
+10. Décris simplement le résultat final à l'utilisateur.
+"""
+
+
 APPROVAL_REQUIRED_TOOLS = {
     "http_get",
 }
