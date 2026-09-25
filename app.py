@@ -45,7 +45,7 @@ def now():
 
 
 def db():
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=60, check_same_thread=False)
     con.row_factory = sqlite3.Row
     return con
 

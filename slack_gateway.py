@@ -112,7 +112,7 @@ def _run_mission_async(objective, channel, thread_ts):
         # Réponse immédiate : l'utilisateur sait que Gaïrus travaille.
         send_message(
             channel,
-            "🧠 Je m'en occupe. Je vais traiter ta demande et revenir avec le résultat.",
+            "",
             thread_ts,
         )
 
