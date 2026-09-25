@@ -332,6 +332,17 @@ def icon_192():
 def icon_512():
     return send_from_directory("static", "icon-512.png")
 
+@app.route("/runtime-config")
+def runtime_config():
+    import os
+    return jsonify({
+        "GAIRUS_AUTONOMY": os.getenv("GAIRUS_AUTONOMY"),
+        "GAIRUS_APPROVALS": os.getenv("GAIRUS_APPROVALS"),
+        "GAIRUS_LLM_PROVIDER": os.getenv("GAIRUS_LLM_PROVIDER"),
+        "GAIRUS_LLM_MODEL": os.getenv("GAIRUS_LLM_MODEL"),
+    })
+
+
 @app.route("/health")
 def health():
     return jsonify({
