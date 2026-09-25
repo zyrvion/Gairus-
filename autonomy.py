@@ -1,3 +1,4 @@
+import re
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -1579,7 +1580,24 @@ Règles :
 - Chaque tâche doit être concrète.
 - Utilise un outil disponible lorsque cela permet réellement d'accomplir
   la demande.
-- Utilise "none" uniquement lorsqu'aucun outil n'est nécessaire.
+- Utilise "none" UNIQUEMENT lorsqu'aucun outil disponible ne peut accomplir
+  l'action demandée.
+- Si l'objectif ou la description mentionne explicitement le nom d'un outil
+  disponible, cet outil DOIT être utilisé dans une tâche correspondante.
+- Ne mets JAMAIS "tool": "none" pour une tâche qui demande une opération
+  réalisable par un outil disponible.
+- Une tâche ne doit pas regrouper plusieurs opérations distinctes lorsqu'elles
+  nécessitent plusieurs outils. Crée une tâche par opération importante.
+- Pour lire un fichier du workspace, utilise obligatoirement read_code avec
+  {{"path": "..."}}.
+- Pour vérifier la syntaxe d'un fichier Python, utilise obligatoirement
+  run_python_test avec {{"path": "..."}}.
+- Pour modifier un fichier, utilise write_code avec {{"path": "...",
+  "content": "..."}}.
+- Pour réparer une erreur Python, utilise self_repair avec {{"path": "..."}}.
+- Pour inspecter les changements, utilise git_diff.
+- Pour créer un commit, utilise git_commit avec {{"message": "...",
+  "paths": ["..."]}}. Ne crée jamais de git_commit sans paths explicites.
 - Les paramètres doivent être directement utilisables par l'outil.
 - Ne prétends jamais qu'une action a déjà été exécutée.
 - Ne produis aucun raisonnement, uniquement le JSON.
@@ -1627,23 +1645,42 @@ def autonomous_plan_mission(mission_id):
     reply = result.get("reply", "") if isinstance(result, dict) else str(result)
 
     try:
-        match = re.search(r"\{.*\}", reply, re.S)
-        plan = json.loads(match.group(0) if match else reply)
-        if not isinstance(plan, dict):
-            raise ValueError("Plan invalide")
-    except Exception:
-        plan = {
-            "tasks": [{
-                "title": "Répondre à la demande",
-                "description": objective,
-                "priority": 1,
-                "tool": "none",
-                "requires_approval": False,
-                "parameters": {},
-            }]
-        }
+        cleaned_reply = str(reply or "").strip()
 
-    tasks = plan.get("tasks", [])
+        # Accepte une réponse JSON brute ou placée dans un bloc Markdown.
+        fenced = re.search(
+            r"```(?:json)?\s*(.*?)\s*```",
+            cleaned_reply,
+            re.IGNORECASE | re.DOTALL,
+        )
+
+        if fenced:
+            cleaned_reply = fenced.group(1).strip()
+
+        match = re.search(r"\{.*\}", cleaned_reply, re.DOTALL)
+
+        if not match:
+            raise ValueError(
+                "Le planificateur n'a fourni aucun objet JSON exploitable."
+            )
+
+        plan = json.loads(match.group(0))
+
+        if not isinstance(plan, dict):
+            raise ValueError("Le planificateur a fourni un plan invalide.")
+
+        tasks = plan.get("tasks")
+
+        if not isinstance(tasks, list):
+            raise ValueError(
+                "Le planificateur a fourni un champ 'tasks' invalide."
+            )
+
+    except Exception as exc:
+        raise RuntimeError(
+            f"Échec de planification autonome : {exc}"
+        ) from exc
+
     created = []
 
     for item in tasks[:10]:
@@ -1802,10 +1839,7 @@ def _autonomous_mission_cycle_locked(mission_id):
 
                 kind, fn = registry[tool_name]
 
-                if kind == "native":
-                    value = fn(parameters or {})
-                else:
-                    value = fn(**(parameters or {}))
+                value = fn(**(parameters or {}))
 
                 with db() as conn:
                     conn.execute(
