@@ -1,5 +1,6 @@
 import re
 from dotenv import load_dotenv
+from pathlib import Path
 load_dotenv()
 
 import os
@@ -1900,6 +1901,23 @@ def _autonomous_mission_cycle_locked(mission_id):
 
         refresh_mission_status(mission_id)
 
+        # ========================================================
+        # SOURCE DE VERITE ZYRVION
+        # ========================================================
+        # Le moteur autonome doit disposer directement de la
+        # connaissance structurée ZYRVION. Elle ne dépend donc
+        # plus exclusivement du contexte Slack.
+        try:
+            zyrvion_knowledge_path = Path(__file__).resolve().parent / "zyrvion_knowledge.md"
+            zyrvion_knowledge = zyrvion_knowledge_path.read_text(
+                encoding="utf-8"
+            )
+        except Exception:
+            zyrvion_knowledge = (
+                "La connaissance structurée ZYRVION est indisponible. "
+                "N'invente aucune information sur ZYRVION."
+            )
+
         # Synthèse finale destinée à l'utilisateur.
         execution_context = json.dumps(
             results,
@@ -1912,12 +1930,15 @@ def _autonomous_mission_cycle_locked(mission_id):
 Objectif utilisateur :
 {mission["objective"]}
 
+Connaissance structurée interne de ZYRVION :
+{zyrvion_knowledge}
+
 Résultats réels des actions exécutées :
 {execution_context}
 
 Donne maintenant la réponse finale à l'utilisateur.
 
-Règles :
+Règles générales :
 - Réponds directement à sa demande.
 - Ne parle jamais de mission_id.
 - Ne parle pas de ton raisonnement interne.
@@ -1926,6 +1947,33 @@ Règles :
 - Si des informations ont réellement été trouvées, présente-les clairement.
 - Si aucune action n'était nécessaire, réponds directement à l'objectif.
 - Réponds comme un collègue compétent dans Slack.
+
+RÈGLE ABSOLUE DE VÉRACITÉ POUR ZYRVION :
+- ZYRVION désigne le projet interne décrit par les informations fournies
+  dans le contexte de cette demande.
+- Lorsque la demande concerne ZYRVION, utilise prioritairement et
+  exclusivement les informations internes fournies dans le contexte,
+  notamment la connaissance structurée ZYRVION et la mémoire Slack.
+- N'utilise jamais tes connaissances générales du web ou du monde pour
+  compléter, remplacer ou inventer la description de ZYRVION.
+- N'invente jamais le nom d'une entreprise, son pays, sa ville, sa date
+  de création, ses produits, ses clients, ses connecteurs, ses chiffres,
+  ses certifications ou toute autre caractéristique de ZYRVION si ces
+  informations ne sont pas présentes dans les informations internes
+  fournies.
+- Si le contexte interne ne contient pas la réponse à une question sur
+  ZYRVION, dis clairement que cette information n'est pas connue dans
+  la connaissance actuelle de ZYRVION.
+- Ne transforme jamais une hypothèse ou une connaissance générale en
+  fait concernant ZYRVION.
+- Pour une question comme « C'est quoi ZYRVION ? », base ta réponse
+  directement sur la connaissance structurée interne fournie ci-dessus.
+- Lorsque la question porte sur ZYRVION, la connaissance structurée
+  interne est prioritaire sur toute connaissance générale du modèle.
+- Ne complète jamais une information absente avec une information
+  provenant de tes connaissances générales.
+- Si une information n'est pas définie dans la connaissance interne,
+  indique qu'elle n'est pas connue plutôt que de l'inventer.
 """,
             system=(
                 "Tu es Gaïrus. Tu produis uniquement la réponse finale "
