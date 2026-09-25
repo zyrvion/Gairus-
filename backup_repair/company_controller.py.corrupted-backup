@@ -1,7 +1,6 @@
 from core.audit_gateway import AuditGateway
 from core.action_gateway import ActionGateway
-from core.governance_gate import GovernanceGate
-from typing import Any, Dict
+from core.governance_gate import GovernanceGate\nfrom typing import Any, Dict
 
 from core.enterprise import EnterpriseEngine
 from core.enterprise_roles import has_permission

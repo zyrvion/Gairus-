@@ -1,6 +1,3 @@
-from core.audit_gateway import AuditGateway
-from core.action_gateway import ActionGateway
-from core.governance_gate import GovernanceGate
 from typing import Any, Dict
 
 from core.enterprise import EnterpriseEngine
@@ -27,9 +24,6 @@ class CompanyController:
 
     def __init__(self, enterprise=None):
         self.enterprise = enterprise or EnterpriseEngine()
-        self.action_gateway = ActionGateway(enterprise=self.enterprise, controller=self)
-        self.audit_gateway = AuditGateway(enterprise=self.enterprise)
-        self.governance_gate = GovernanceGate(self.enterprise)
 
     def _get_employee(self, actor_id):
         """
@@ -45,53 +39,6 @@ class CompanyController:
             return False
 
         return has_permission(role, permission)
-
-    def governance(self, actor_id, requested_action, amount=None):
-        return self.enterprise.governance_check(
-            actor_id=actor_id,
-            action=requested_action,
-            amount=amount,
-        )
-
-
-    def require_governance(self, actor_id, action, amount=None):
-        """
-        Point d'entrée unique pour les modules Enterprise.
-        Lève GovernanceBlocked si l'action n'est pas autorisée.
-        """
-        return self.governance_gate.check(
-            actor_id=actor_id,
-            action=action,
-            amount=amount,
-            require_approval=True,
-        )
-
-
-    def audit_action(
-        self,
-        *,
-        actor_id=None,
-        action=None,
-        tool=None,
-        amount=None,
-        status=None,
-        result=None,
-        error=None,
-        mission_id=None,
-        metadata=None,
-    ):
-        return self.audit_gateway.record(
-            event="company_action",
-            actor_id=actor_id,
-            action=action,
-            tool=tool,
-            amount=amount,
-            status=status,
-            result=result,
-            error=error,
-            mission_id=mission_id,
-            metadata=metadata,
-        )
 
     def execute(self, actor_id: str, action: str, **kwargs) -> Dict[str, Any]:
         employee = self._get_employee(actor_id)
@@ -114,26 +61,12 @@ class CompanyController:
 
         permission = action_permissions.get(action)
 
-        if action == "governance":
-            return self.governance(
-                actor_id=employee.id,
-                requested_action=kwargs.get("requested_action"),
-                amount=kwargs.get("amount"),
-            )
-
         if permission is None:
             return {
                 "status": "error",
                 "message": "Action inconnue",
                 "action": action,
             }
-        if action == "governance":
-            return self.governance(
-                actor_id=employee.id,
-                requested_action=kwargs.get("requested_action"),
-                amount=kwargs.get("amount"),
-            )
-
 
         if not self._permission(employee, permission):
             return {

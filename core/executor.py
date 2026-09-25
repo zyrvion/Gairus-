@@ -1,7 +1,26 @@
 from core.audit_gateway import AuditGateway
 from core.action_gateway import ActionGateway
-class Executor:
 
+
+class Executor:
+    """
+    Moteur d'exécution compatible avec l'ancien système de permissions
+    et avec le nouveau système Enterprise / Governance / Audit.
+    """
+
+    def __init__(self, permissions=None, enterprise=None, controller=None):
+        self.permissions = permissions
+        self.enterprise = enterprise
+        self.controller = controller
+
+        self.action_gateway = ActionGateway(
+            enterprise=enterprise,
+            controller=controller,
+        )
+
+        self.audit_gateway = AuditGateway(
+            enterprise=enterprise,
+        )
 
     def audit_execution(
         self,
@@ -29,7 +48,6 @@ class Executor:
             metadata=metadata,
         )
 
-
     def authorize_action(
         self,
         actor_id=None,
@@ -38,7 +56,7 @@ class Executor:
         amount=None,
     ):
         """
-        Contrôle obligatoire avant une action Enterprise.
+        Contrôle Enterprise obligatoire lorsqu'un actor_id est fourni.
         """
         return self.action_gateway.authorize(
             actor_id=actor_id,
@@ -47,56 +65,159 @@ class Executor:
             amount=amount,
         )
 
+    def execute(
+        self,
+        action,
+        risk="medium",
+        handler=None,
+        actor_id=None,
+        tool=None,
+        amount=None,
+        mission_id=None,
+        metadata=None,
+    ):
+        """
+        Exécute une action.
 
-    def __init__(self, permissions, 
-        self.enterprise = enterprise
-        self.controller = controller
-        self.action_gateway = ActionGateway(
-            enterprise=enterprise,
-            controller=controller,
-        )
-        self.audit_gateway = AuditGateway(enterprise=enterprise)
-enterprise=None, controller=None):
-        self.permissions = permissions
+        Compatibilité :
+        - ancien appel : permissions.allowed(action, risk)
+        - appel Enterprise : actor_id déclenche Governance + Audit
+        """
 
-    def execute(self, action, risk="medium", handler=None):
+        authorization = None
 
-        # ========================================================
-        # ENTERPRISE GOVERNANCE EXECUTION GATE
-        # ========================================================
-        #
-        # Compatibilité :
-        #   - ancien appel Executor : aucun actor_id => inchangé
-        #   - appel Enterprise : actor_id => gouvernance obligatoire
-        #
-        _actor_id = locals().get("actor_id")
-        _amount = locals().get("amount")
-        _tool = locals().get("tool")
+        try:
+            # =====================================================
+            # ENTERPRISE GOVERNANCE GATE
+            # =====================================================
+            if actor_id is not None:
+                authorization = self.authorize_action(
+                    actor_id=actor_id,
+                    action=action,
+                    tool=tool,
+                    amount=amount,
+                )
 
-        if _actor_id is not None:
-            _action = locals().get("action")
-            if _action is None:
-                _action = locals().get("operation")
-            if _action is None:
-                _action = _tool or "execute"
+                if authorization is None:
+                    result = {
+                        "status": "blocked",
+                        "action": action,
+                        "message": "Autorisation Enterprise invalide",
+                    }
 
-            self.authorize_action(
-                actor_id=_actor_id,
-                action=_action,
-                tool=_tool,
-                amount=_amount,
+                    self.audit_execution(
+                        actor_id=actor_id,
+                        action=action,
+                        tool=tool,
+                        amount=amount,
+                        status="blocked",
+                        result=result,
+                        mission_id=mission_id,
+                        metadata=metadata,
+                    )
+
+                    return result
+
+                if authorization.get("status") in {
+                    "blocked",
+                    "denied",
+                    "error",
+                    "approval_required",
+                }:
+                    result = {
+                        "status": authorization.get("status"),
+                        "action": action,
+                        "authorization": authorization,
+                    }
+
+                    self.audit_execution(
+                        actor_id=actor_id,
+                        action=action,
+                        tool=tool,
+                        amount=amount,
+                        status=result["status"],
+                        result=result,
+                        mission_id=mission_id,
+                        metadata=metadata,
+                    )
+
+                    return result
+
+            # =====================================================
+            # ANCIEN SYSTEME DE PERMISSIONS
+            # =====================================================
+            if self.permissions is not None:
+                allowed = self.permissions.allowed(action, risk)
+
+                if not allowed:
+                    result = {
+                        "status": "approval_required",
+                        "action": action,
+                    }
+
+                    self.audit_execution(
+                        actor_id=actor_id,
+                        action=action,
+                        tool=tool,
+                        amount=amount,
+                        status="approval_required",
+                        result=result,
+                        mission_id=mission_id,
+                        metadata=metadata,
+                    )
+
+                    return result
+
+            # =====================================================
+            # EXECUTION
+            # =====================================================
+            if handler:
+                value = handler()
+
+                result = {
+                    "status": "completed",
+                    "action": action,
+                    "result": value,
+                }
+            else:
+                result = {
+                    "status": "completed",
+                    "action": action,
+                }
+
+            self.audit_execution(
+                actor_id=actor_id,
+                action=action,
+                tool=tool,
+                amount=amount,
+                status="completed",
+                result=result,
+                mission_id=mission_id,
+                metadata=metadata,
             )
 
-        if not self.permissions.allowed(action, risk):
-            return {
-                "status": "approval_required",
+            return result
+
+        except Exception as exc:
+            result = {
+                "status": "error",
                 "action": action,
+                "error": str(exc),
             }
 
-        if handler:
-            return handler()
+            try:
+                self.audit_execution(
+                    actor_id=actor_id,
+                    action=action,
+                    tool=tool,
+                    amount=amount,
+                    status="error",
+                    result=result,
+                    error=str(exc),
+                    mission_id=mission_id,
+                    metadata=metadata,
+                )
+            except Exception:
+                pass
 
-        return {
-            "status": "completed",
-            "action": action,
-        }
+            return result

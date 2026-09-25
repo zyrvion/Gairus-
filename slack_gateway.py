@@ -397,3 +397,66 @@ def slack_health():
     }
 
 # === END GAIRUS_SLACK_HEALTH ===
+
+
+# === GAIRUS_AGENT_BRIDGE ===
+
+try:
+    from core.slack_agent_bridge import SlackAgentBridge
+    from core.final_operations_runtime import get_operations_gairus
+
+    _gairus_bridge = None
+
+    def _get_gairus_bridge():
+        global _gairus_bridge
+
+        if _gairus_bridge is None:
+            agent = get_operations_gairus()
+
+            integration = getattr(
+                getattr(agent, "runtime", None),
+                "slack",
+                None,
+            )
+
+            _gairus_bridge = SlackAgentBridge(
+                agent=agent,
+                integration=integration,
+            )
+
+        return _gairus_bridge
+
+except Exception:
+    SlackAgentBridge = None
+    _gairus_bridge = None
+
+    def _get_gairus_bridge():
+        return None
+
+
+def process_gairus_slack_message(
+    text,
+    user_id=None,
+    channel_id=None,
+    team_id=None,
+):
+    bridge = _get_gairus_bridge()
+
+    if bridge is None:
+        return {
+            "ok": False,
+            "error": "gairus_bridge_unavailable",
+        }
+
+    return bridge.handle_event(
+        {
+            "text": text,
+            "user_id": user_id,
+            "channel_id": channel_id,
+            "team_id": team_id,
+        }
+    )
+
+
+# === END GAIRUS_AGENT_BRIDGE ===
+

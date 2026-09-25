@@ -1,3 +1,4 @@
+from security.audit import get_audit_logger
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
@@ -239,7 +240,8 @@ class EnterpriseEngine:
             "approval_required": True,
         }
 
-    def request_approval(
+    # AUDIT_APPROVAL_REQUEST
+def request_approval(
         self,
         actor_id,
         action,
@@ -323,7 +325,8 @@ class EnterpriseEngine:
             "approval": approval,
         }
 
-    def resolve_approval(
+    # AUDIT_APPROVAL_RESOLUTION
+def resolve_approval(
         self,
         approval_id,
         approver_id,
