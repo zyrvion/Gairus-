@@ -6,6 +6,8 @@ from core.autonomous_integration import AutonomousIntegration
 from core.autonomous_runtime_bridge import integrate_autonomous_runtime
 from core.gairus_cognitive_evolution import get_cognitive_evolution
 from core.gairus_cognitive_evolution_bridge import integrate_cognitive_evolution
+from core.gairus_cognitive_context import integrate_cognitive_context
+
 _instance = None
 
 
@@ -49,6 +51,9 @@ def get_operations_gairus():
         cognitive_evolution = integrate_cognitive_evolution(runtime)
         agent.cognitive_evolution = cognitive_evolution
         runtime.cognitive_evolution = cognitive_evolution
+        cognitive_context = integrate_cognitive_context(runtime)
+        agent.cognitive_context = cognitive_context
+        runtime.cognitive_context = cognitive_context
         try:
             if hasattr(health, "register"):
                 health.register(
