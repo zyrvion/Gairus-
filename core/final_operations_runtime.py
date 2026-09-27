@@ -1,11 +1,11 @@
 from __future__ import annotations
-
+from core.gairus_self_evolution import get_self_evolution
 from core.final_external_runtime import get_final_gairus
 from core.gairus_operations import GairusOperations
 from core.autonomous_integration import AutonomousIntegration
 from core.autonomous_runtime_bridge import integrate_autonomous_runtime
 from core.gairus_cognitive_evolution import get_cognitive_evolution
-
+from core.gairus_cognitive_evolution_bridge import integrate_cognitive_evolution
 _instance = None
 
 
@@ -43,7 +43,20 @@ def get_operations_gairus():
         cognitive = get_cognitive_evolution(runtime)
         agent.cognitive = cognitive
         runtime.cognitive = cognitive
-
+        evolution = get_self_evolution(runtime)
+        agent.self_evolution = evolution
+        runtime.self_evolution = evolution
+        cognitive_evolution = integrate_cognitive_evolution(runtime)
+        agent.cognitive_evolution = cognitive_evolution
+        runtime.cognitive_evolution = cognitive_evolution
+        try:
+            if hasattr(health, "register"):
+                health.register(
+                    "self_evolution",
+                    evolution,
+                )
+        except Exception:
+            pass
         try:
             cognitive.set_identity(
                 "gairus.name",
@@ -57,8 +70,8 @@ def get_operations_gairus():
             )
             cognitive.set_identity(
                 "gairus.creator",
-                "Arta",
-                "creator",
+                "Arta Lyon Némésis",
+                "creator and founder",
             )
         except Exception:
             pass
