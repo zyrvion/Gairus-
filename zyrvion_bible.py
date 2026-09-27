@@ -1,731 +1,625 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
-╔══════════════════════════════════════════════════════════════════════╗
-║                         ZYRVION BIBLE                              ║
-║                 UNIVERSAL KNOWLEDGE CORE                           ║
-╚══════════════════════════════════════════════════════════════════════╝
+ZYRVION BIBLE
+Universal Knowledge Core
+Agent: Gaïrus
 
-Projet : ZYRVION
-Type   : Bible / architecture de connaissances / catalogue universel
-Objectif :
-    Construire un référentiel mondial évolutif des services,
-    compétences, solutions humaines, entreprises, professionnels,
-    technologies et possibilités pouvant être connectés à Zyrvion.
-
-VISION CENTRALE
----------------
-Zyrvion est conçu comme un écosystème intelligent capable de transformer
-un besoin humain en solution concrète.
-
-Architecture fondamentale du catalogue :
-
-Univers
-    ↓
-Secteur
-    ↓
-Catégorie
-    ↓
-Sous-catégorie
-    ↓
-Service
-    ↓
-Variante
-    ↓
-Localisation
-    ↓
-Prestataire
-    ↓
-Disponibilité
-    ↓
-Prix
-    ↓
-Conditions
-    ↓
-Exécution
-    ↓
-Vérification
-    ↓
-Évaluation
-    ↓
-Amélioration
-
-OBJECTIF ULTIME
----------------
-Le catalogue Zyrvion doit pouvoir évoluer vers :
-
-1 000 000 000+ services et possibilités.
-
-Ce nombre représente une architecture extensible et non une liste statique.
-Les services peuvent être combinés avec :
-
-- localisation
-- langue
-- métier
-- spécialité
-- disponibilité
-- horaires
-- prix
-- niveau de compétence
-- urgence
-- distance
-- préférences utilisateur
-- contexte
-- budget
-- équipement
-- technologie
-- prestataire
-- entreprise
-- institution
-- plateforme
-- API
-- automatisation
-- agent IA
-- résultat attendu
-
-ZYRVION doit donc pouvoir découvrir, classifier, enrichir et connecter
-des services continuellement.
+Objectif:
+- architecture universelle de services
+- catalogue extensible
+- objectif de plus de 1 000 000 000 services
+- recherche et orchestration des services
+- enrichissement dynamique
 """
 
-ZYRVION = {
-    "name": "ZYRVION",
-    "type": "universal_ai_service_ecosystem",
-    "vision": "Connecter les besoins humains aux solutions disponibles dans le monde.",
-    "ultimate_service_target": "1,000,000,000+",
-    "catalogue_dynamic": True,
+from __future__ import annotations
 
-    "catalogue_architecture": [
-        "univers",
-        "secteur",
-        "categorie",
-        "sous_categorie",
-        "service",
-        "variante",
-        "localisation",
-        "prestataire",
-        "disponibilite",
-        "prix",
-        "conditions",
-        "execution",
-        "verification",
-        "evaluation",
-        "amelioration"
-    ],
+from dataclasses import dataclass, asdict, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+import json
+import re
 
-    "principles": [
-        "Toute demande peut être transformée en objectif.",
-        "Tout objectif peut être décomposé en tâches.",
-        "Toute tâche peut rechercher une compétence ou un service.",
-        "Tout service peut être associé à un prestataire.",
-        "Tout prestataire peut être localisé.",
-        "Tout service peut posséder plusieurs variantes.",
-        "Le catalogue doit être extensible.",
-        "Le catalogue doit pouvoir apprendre.",
-        "Le catalogue doit pouvoir être mis à jour.",
-        "Le système doit éviter les doublons.",
-        "Le système doit vérifier les informations.",
-        "Le système doit conserver le contexte.",
-        "Le système doit pouvoir orchestrer plusieurs services.",
-        "Le système doit pouvoir transformer plusieurs services en une solution complète."
+
+ZYRVION_NAME = "ZYRVION"
+ZYRVION_VERSION = "1.0.0"
+CATALOGUE_TARGET = 1_000_000_000
+
+
+ARCHITECTURE = [
+    "Univers",
+    "Secteur",
+    "Catégorie",
+    "Sous-catégorie",
+    "Service",
+    "Variante",
+    "Localisation",
+    "Prestataire",
+    "Disponibilité",
+    "Prix",
+    "Conditions",
+    "Exécution",
+    "Vérification",
+    "Évaluation",
+    "Amélioration",
+]
+
+
+PRINCIPLES = [
+    "Toute demande peut devenir un objectif.",
+    "Tout objectif peut être décomposé en tâches.",
+    "Toute tâche peut nécessiter plusieurs compétences.",
+    "Toute compétence peut être associée à plusieurs services.",
+    "Chaque service peut avoir plusieurs variantes.",
+    "Le contexte influence le service choisi.",
+    "La localisation influence les possibilités.",
+    "Le budget influence les possibilités.",
+    "L'urgence influence les possibilités.",
+    "Plusieurs services peuvent être combinés.",
+    "Les résultats doivent être vérifiés.",
+    "Les erreurs doivent être détectées.",
+    "Les erreurs doivent être corrigées lorsque possible.",
+    "Le catalogue doit pouvoir évoluer.",
+    "Les doublons doivent être évités.",
+]
+
+
+UNIVERS = {
+    1: "Besoins essentiels du quotidien",
+    2: "Commerce, produits et distribution",
+    3: "Services professionnels et expertises",
+    4: "Santé, médecine, beauté et bien-être",
+    5: "Éducation, formation et connaissance",
+    6: "Transport, mobilité et logistique",
+    7: "Habitat, immobilier, construction et environnement",
+    8: "Finance, banque, assurance et économie",
+    9: "Technologie, informatique, intelligence artificielle et innovation",
+    10: "Tourisme, voyage, hôtellerie et expériences",
+    11: "Agriculture, élevage, alimentation et ressources naturelles",
+    12: "Commerce, entreprises, vente et distribution mondiale",
+    13: "Industrie, production, artisanat et fabrication",
+}
+
+
+@dataclass
+class Service:
+    id: int
+    nom: str
+    univers: str
+    secteur: str = ""
+    categorie: str = ""
+    sous_categorie: str = ""
+    variantes: List[str] = field(default_factory=list)
+    localisations: List[str] = field(default_factory=list)
+    prestataires: List[str] = field(default_factory=list)
+    description: str = ""
+    actif: bool = True
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+SERVICES: Dict[int, Service] = {}
+
+
+def ajouter_service(
+    service_id: int,
+    nom: str,
+    univers: str,
+    secteur: str = "",
+    categorie: str = "",
+    sous_categorie: str = "",
+    variantes: Optional[List[str]] = None,
+    localisations: Optional[List[str]] = None,
+    prestataires: Optional[List[str]] = None,
+    description: str = "",
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Service:
+
+    if service_id in SERVICES:
+        return SERVICES[service_id]
+
+    service = Service(
+        id=service_id,
+        nom=nom,
+        univers=univers,
+        secteur=secteur,
+        categorie=categorie,
+        sous_categorie=sous_categorie,
+        variantes=variantes or [],
+        localisations=localisations or [],
+        prestataires=prestataires or [],
+        description=description,
+        metadata=metadata or {},
+    )
+
+    SERVICES[service_id] = service
+    return service
+
+
+def generer_variantes() -> List[str]:
+    return [
+        "standard",
+        "premium",
+        "express",
+        "à domicile",
+        "en ligne",
+        "professionnel",
+        "personnalisé",
+        "automatisé",
+        "local",
+        "international",
     ]
-}
 
 
-# ======================================================================
-# CATALOGUE UNIVERSEL ZYRVION
-# ======================================================================
+def enrichir_service(service: Service) -> None:
 
-CATALOGUE = {
+    if not service.variantes:
+        service.variantes = generer_variantes()
 
-    1: {
-        "nom": "Besoins essentiels du quotidien",
-        "services": "1-80"
-    },
+    if not service.localisations:
+        service.localisations = [
+            "local",
+            "national",
+            "international",
+        ]
 
-    2: {
-        "nom": "Commerce, produits & distribution",
-        "services": "81-200"
-    },
+# ============================================================
+# SERVICES DE BASE
+# ============================================================
 
-    3: {
-        "nom": "Services professionnels & expertises",
-        "services": "201-340"
-    },
+BASE_SERVICES = [
 
-    4: {
-        "nom": "Santé, médecine, beauté & bien-être",
-        "services": "341-470"
-    },
+    # UNIVERS 1
+    (1, "Courses alimentaires", "Besoins essentiels du quotidien"),
+    (2, "Livraison de repas", "Besoins essentiels du quotidien"),
+    (3, "Nettoyage domestique", "Besoins essentiels du quotidien"),
+    (4, "Blanchisserie", "Besoins essentiels du quotidien"),
+    (5, "Coiffure à domicile", "Besoins essentiels du quotidien"),
+    (6, "Réparation domestique", "Besoins essentiels du quotidien"),
+    (7, "Plomberie", "Besoins essentiels du quotidien"),
+    (8, "Électricité domestique", "Besoins essentiels du quotidien"),
+    (9, "Garde d'enfants", "Besoins essentiels du quotidien"),
+    (10, "Aide à domicile", "Besoins essentiels du quotidien"),
 
-    5: {
-        "nom": "Éducation, formation & connaissance",
-        "services": "471-600"
-    },
+    # UNIVERS 2
+    (81, "Boutique en ligne", "Commerce, produits et distribution"),
+    (82, "Marketplace", "Commerce, produits et distribution"),
+    (83, "Livraison de produits", "Commerce, produits et distribution"),
+    (84, "Achat de vêtements", "Commerce, produits et distribution"),
+    (85, "Achat d'électronique", "Commerce, produits et distribution"),
+    (86, "Achat de meubles", "Commerce, produits et distribution"),
+    (87, "Achat de produits alimentaires", "Commerce, produits et distribution"),
+    (88, "Achat de fournitures", "Commerce, produits et distribution"),
+    (89, "Comparateur de produits", "Commerce, produits et distribution"),
+    (90, "Service après-vente", "Commerce, produits et distribution"),
 
-    6: {
-        "nom": "Transport, mobilité & logistique",
-        "services": "601-730"
-    },
+    # UNIVERS 3
+    (201, "Conseil juridique", "Services professionnels et expertises"),
+    (202, "Comptabilité", "Services professionnels et expertises"),
+    (203, "Audit", "Services professionnels et expertises"),
+    (204, "Conseil financier", "Services professionnels et expertises"),
+    (205, "Conseil marketing", "Services professionnels et expertises"),
+    (206, "Création graphique", "Services professionnels et expertises"),
+    (207, "Traduction", "Services professionnels et expertises"),
+    (208, "Interprétation", "Services professionnels et expertises"),
+    (209, "Conseil en entreprise", "Services professionnels et expertises"),
+    (210, "Recrutement", "Services professionnels et expertises"),
 
-    7: {
-        "nom": "Habitat, immobilier, construction & environnement",
-        "services": "731-870"
-    },
+    # UNIVERS 4
+    (341, "Médecin généraliste", "Santé, médecine, beauté et bien-être"),
+    (342, "Consultation médicale à domicile", "Santé, médecine, beauté et bien-être"),
+    (343, "Dentiste", "Santé, médecine, beauté et bien-être"),
+    (344, "Pharmacie", "Santé, médecine, beauté et bien-être"),
+    (345, "Laboratoire médical", "Santé, médecine, beauté et bien-être"),
+    (346, "Kinésithérapie", "Santé, médecine, beauté et bien-être"),
+    (347, "Psychologie", "Santé, médecine, beauté et bien-être"),
+    (348, "Nutrition", "Santé, médecine, beauté et bien-être"),
+    (349, "Opticien", "Santé, médecine, beauté et bien-être"),
+    (350, "Beauté et esthétique", "Santé, médecine, beauté et bien-être"),
 
-    8: {
-        "nom": "Finance, banque, assurance & économie",
-        "services": "871-1000"
-    },
+    # UNIVERS 5
+    (471, "École maternelle", "Éducation, formation et connaissance"),
+    (472, "École primaire", "Éducation, formation et connaissance"),
+    (473, "Collège", "Éducation, formation et connaissance"),
+    (474, "Lycée", "Éducation, formation et connaissance"),
+    (475, "Université", "Éducation, formation et connaissance"),
+    (476, "Formation professionnelle", "Éducation, formation et connaissance"),
+    (477, "Cours particuliers", "Éducation, formation et connaissance"),
+    (478, "Formation en ligne", "Éducation, formation et connaissance"),
+    (479, "Bibliothèque numérique", "Éducation, formation et connaissance"),
+    (480, "Développement des compétences", "Éducation, formation et connaissance"),
 
-    9: {
-        "nom": "Technologie, informatique, intelligence artificielle & innovation",
-        "services": "1001-1130"
-    },
+    # UNIVERS 6
+    (601, "Taxi traditionnel", "Transport, mobilité et logistique"),
+    (602, "VTC", "Transport, mobilité et logistique"),
+    (603, "Location de voiture", "Transport, mobilité et logistique"),
+    (604, "Location de moto", "Transport, mobilité et logistique"),
+    (605, "Transport public", "Transport, mobilité et logistique"),
+    (606, "Transport de marchandises", "Transport, mobilité et logistique"),
+    (607, "Livraison express", "Transport, mobilité et logistique"),
+    (608, "Déménagement", "Transport, mobilité et logistique"),
+    (609, "Fret international", "Transport, mobilité et logistique"),
+    (610, "Logistique intelligente", "Transport, mobilité et logistique"),
 
-    10: {
-        "nom": "Tourisme, voyage, hôtellerie & expériences",
-        "services": "1131-1260"
-    },
+    # UNIVERS 7
+    (731, "Agence immobilière", "Habitat, immobilier, construction et environnement"),
+    (732, "Location immobilière", "Habitat, immobilier, construction et environnement"),
+    (733, "Vente immobilière", "Habitat, immobilier, construction et environnement"),
+    (734, "Construction de maison", "Habitat, immobilier, construction et environnement"),
+    (735, "Rénovation", "Habitat, immobilier, construction et environnement"),
+    (736, "Architecture", "Habitat, immobilier, construction et environnement"),
+    (737, "Décoration intérieure", "Habitat, immobilier, construction et environnement"),
+    (738, "Jardinage", "Habitat, immobilier, construction et environnement"),
+    (739, "Gestion des déchets", "Habitat, immobilier, construction et environnement"),
+    (740, "Maison connectée", "Habitat, immobilier, construction et environnement"),
 
-    11: {
-        "nom": "Agriculture, élevage, alimentation & ressources naturelles",
-        "services": "1261-1380"
-    },
+]
 
-    12: {
-        "nom": "Commerce, entreprises, vente & distribution mondiale",
-        "services": "1381-1500"
-    },
+# ============================================================
+# SERVICES DE BASE : UNIVERS 8 À 13
+# ============================================================
 
-    13: {
-        "nom": "Industrie, production, artisanat & fabrication",
-        "services": "1501+"
+BASE_SERVICES += [
+
+    # UNIVERS 8
+    (871, "Compte bancaire personnel", "Finance, banque, assurance et économie"),
+    (872, "Compte professionnel", "Finance, banque, assurance et économie"),
+    (873, "Transfert d'argent", "Finance, banque, assurance et économie"),
+    (874, "Paiement numérique", "Finance, banque, assurance et économie"),
+    (875, "Assurance automobile", "Finance, banque, assurance et économie"),
+    (876, "Assurance habitation", "Finance, banque, assurance et économie"),
+    (877, "Assurance santé", "Finance, banque, assurance et économie"),
+    (878, "Crédit", "Finance, banque, assurance et économie"),
+    (879, "Épargne", "Finance, banque, assurance et économie"),
+    (880, "Investissement", "Finance, banque, assurance et économie"),
+
+    # UNIVERS 9
+    (1001, "Dépannage informatique", "Technologie, informatique, intelligence artificielle et innovation"),
+    (1002, "Développement logiciel", "Technologie, informatique, intelligence artificielle et innovation"),
+    (1003, "Développement web", "Technologie, informatique, intelligence artificielle et innovation"),
+    (1004, "Développement mobile", "Technologie, informatique, intelligence artificielle et innovation"),
+    (1005, "Cybersécurité", "Technologie, informatique, intelligence artificielle et innovation"),
+    (1006, "Cloud computing", "Technologie, informatique, intelligence artificielle et innovation"),
+    (1007, "Intelligence artificielle", "Technologie, informatique, intelligence artificielle et innovation"),
+    (1008, "Automatisation", "Technologie, informatique, intelligence artificielle et innovation"),
+    (1009, "Analyse de données", "Technologie, informatique, intelligence artificielle et innovation"),
+    (1010, "Robotique", "Technologie, informatique, intelligence artificielle et innovation"),
+
+    # UNIVERS 10
+    (1131, "Hôtel économique", "Tourisme, voyage, hôtellerie et expériences"),
+    (1132, "Hôtel", "Tourisme, voyage, hôtellerie et expériences"),
+    (1133, "Hôtel de luxe", "Tourisme, voyage, hôtellerie et expériences"),
+    (1134, "Location de logement", "Tourisme, voyage, hôtellerie et expériences"),
+    (1135, "Billet d'avion", "Tourisme, voyage, hôtellerie et expériences"),
+    (1136, "Billet de train", "Tourisme, voyage, hôtellerie et expériences"),
+    (1137, "Guide touristique", "Tourisme, voyage, hôtellerie et expériences"),
+    (1138, "Excursion", "Tourisme, voyage, hôtellerie et expériences"),
+    (1139, "Réservation de voyage", "Tourisme, voyage, hôtellerie et expériences"),
+    (1140, "Organisation de voyage", "Tourisme, voyage, hôtellerie et expériences"),
+
+    # UNIVERS 11
+    (1261, "Agriculture traditionnelle", "Agriculture, élevage, alimentation et ressources naturelles"),
+    (1262, "Agriculture moderne", "Agriculture, élevage, alimentation et ressources naturelles"),
+    (1263, "Agriculture biologique", "Agriculture, élevage, alimentation et ressources naturelles"),
+    (1264, "Élevage bovin", "Agriculture, élevage, alimentation et ressources naturelles"),
+    (1265, "Élevage avicole", "Agriculture, élevage, alimentation et ressources naturelles"),
+    (1266, "Pêche", "Agriculture, élevage, alimentation et ressources naturelles"),
+    (1267, "Irrigation", "Agriculture, élevage, alimentation et ressources naturelles"),
+    (1268, "Vente de produits agricoles", "Agriculture, élevage, alimentation et ressources naturelles"),
+    (1269, "Transformation alimentaire", "Agriculture, élevage, alimentation et ressources naturelles"),
+    (1270, "Gestion des ressources naturelles", "Agriculture, élevage, alimentation et ressources naturelles"),
+
+    # UNIVERS 12
+    (1381, "Boutique alimentaire", "Commerce, entreprises, vente et distribution mondiale"),
+    (1382, "Supermarché", "Commerce, entreprises, vente et distribution mondiale"),
+    (1383, "Grossiste", "Commerce, entreprises, vente et distribution mondiale"),
+    (1384, "Import-export", "Commerce, entreprises, vente et distribution mondiale"),
+    (1385, "Distribution", "Commerce, entreprises, vente et distribution mondiale"),
+    (1386, "Vente B2B", "Commerce, entreprises, vente et distribution mondiale"),
+    (1387, "Vente B2C", "Commerce, entreprises, vente et distribution mondiale"),
+    (1388, "E-commerce mondial", "Commerce, entreprises, vente et distribution mondiale"),
+    (1389, "Marketplace mondiale", "Commerce, entreprises, vente et distribution mondiale"),
+    (1390, "Commerce universel Zyrvion", "Commerce, entreprises, vente et distribution mondiale"),
+
+    # UNIVERS 13
+    (1501, "Usine", "Industrie, production, artisanat et fabrication"),
+    (1502, "Production industrielle", "Industrie, production, artisanat et fabrication"),
+    (1503, "Fabrication", "Industrie, production, artisanat et fabrication"),
+    (1504, "Artisanat", "Industrie, production, artisanat et fabrication"),
+    (1505, "Matières premières", "Industrie, production, artisanat et fabrication"),
+    (1506, "Maintenance industrielle", "Industrie, production, artisanat et fabrication"),
+    (1507, "Ingénierie industrielle", "Industrie, production, artisanat et fabrication"),
+    (1508, "Chaîne de production", "Industrie, production, artisanat et fabrication"),
+    (1509, "Automatisation industrielle", "Industrie, production, artisanat et fabrication"),
+    (1510, "Contrôle qualité", "Industrie, production, artisanat et fabrication"),
+
+]
+
+# ============================================================
+# ENREGISTREMENT DES SERVICES
+# ============================================================
+
+def charger_services() -> None:
+    for service_id, nom, univers in BASE_SERVICES:
+        ajouter_service(
+            service_id=service_id,
+            nom=nom,
+            univers=univers,
+            description=f"Service universel ZYRVION : {nom}",
+        )
+
+    for service in SERVICES.values():
+        enrichir_service(service)
+
+
+# ============================================================
+# RECHERCHE INTELLIGENTE
+# ============================================================
+
+def rechercher_service(
+    requete: str,
+    univers: Optional[str] = None,
+) -> List[Service]:
+
+    mots = [
+        mot.lower()
+        for mot in re.findall(r"\w+", requete, flags=re.UNICODE)
+        if len(mot) > 1
+    ]
+
+    resultats = []
+
+    for service in SERVICES.values():
+
+        if univers:
+            if service.univers.lower() != univers.lower():
+                continue
+
+        texte = " ".join([
+            service.nom,
+            service.univers,
+            service.secteur,
+            service.categorie,
+            service.sous_categorie,
+            service.description,
+            " ".join(service.variantes),
+        ]).lower()
+
+        score = 0
+
+        for mot in mots:
+            if mot in texte:
+                score += 1
+
+        if score:
+            resultats.append((score, service))
+
+    resultats.sort(
+        key=lambda element: (
+            -element[0],
+            element[1].id,
+        )
+    )
+
+    return [
+        service
+        for _, service in resultats
+    ]
+
+
+# ============================================================
+# ACCÈS AU CATALOGUE
+# ============================================================
+
+def get_service(service_id: int) -> Optional[Service]:
+    return SERVICES.get(service_id)
+
+
+def get_all_services() -> List[Service]:
+    return list(SERVICES.values())
+
+
+def get_catalogue() -> Dict[int, Dict[str, Any]]:
+    return {
+        service_id: service.to_dict()
+        for service_id, service in SERVICES.items()
     }
+
+
+# ============================================================
+# CRÉATION DYNAMIQUE
+# ============================================================
+
+def creer_service_automatiquement(
+    nom: str,
+    univers: str,
+    description: str = "",
+) -> Service:
+
+    nouveau_id = (
+        max(SERVICES.keys()) + 1
+        if SERVICES
+        else 1
+    )
+
+    return ajouter_service(
+        service_id=nouveau_id,
+        nom=nom,
+        univers=univers,
+        description=description,
+    )
+
+
+# ============================================================
+# EXPORT DU CATALOGUE
+# ============================================================
+
+def exporter_catalogue(
+    chemin: str = "zyrvion_catalogue.json",
+) -> Path:
+
+    chemin_fichier = Path(chemin)
+
+    contenu = {
+        "nom": ZYRVION_NAME,
+        "version": ZYRVION_VERSION,
+        "objectif_services": CATALOGUE_TARGET,
+        "nombre_services": len(SERVICES),
+        "univers": UNIVERS,
+        "architecture": ARCHITECTURE,
+        "services": get_catalogue(),
+    }
+
+    chemin_fichier.write_text(
+        json.dumps(
+            contenu,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    return chemin_fichier
+
+
+# ============================================================
+# CONTEXTE DU CERVEAU ZYRVION
+# ============================================================
+
+SYSTEM_CONTEXT = """
+ZYRVION est une architecture universelle d'intelligence,
+d'orchestration et de services.
+
+Le système doit :
+
+- comprendre une demande humaine ;
+- identifier le besoin réel ;
+- transformer le besoin en objectif ;
+- décomposer l'objectif ;
+- identifier les tâches ;
+- identifier les compétences nécessaires ;
+- rechercher les services correspondants ;
+- rechercher les variantes ;
+- prendre en compte la localisation ;
+- prendre en compte le budget ;
+- prendre en compte l'urgence ;
+- prendre en compte les contraintes ;
+- combiner plusieurs services ;
+- construire une solution ;
+- exécuter les étapes lorsque les outils nécessaires sont disponibles ;
+- vérifier les résultats ;
+- détecter les erreurs ;
+- corriger les erreurs lorsque possible ;
+- conserver les informations utiles ;
+- enrichir le catalogue.
+
+ZYRVION doit être extensible.
+
+L'objectif architectural est de pouvoir représenter
+plus de 1 000 000 000 de services, variantes,
+compétences, prestataires, localisations et combinaisons.
+"""
+
+
+# ============================================================
+# BIBLE ZYRVION
+# ============================================================
+
+BIBLE_ZYRVION = {
+    "nom": ZYRVION_NAME,
+    "version": ZYRVION_VERSION,
+    "objectif": CATALOGUE_TARGET,
+    "architecture": ARCHITECTURE,
+    "principes": PRINCIPLES,
+    "univers": UNIVERS,
+    "vision_milliard_services": True,
+    "catalogue_universel": True,
+    "structure_historique": {
+        "tome": "Tome VII",
+        "livres": [
+            "Livre XCI",
+            "Livre XCII",
+            "Livre XCIII",
+        ],
+    },
+    "system_context": SYSTEM_CONTEXT,
 }
 
 
-# ======================================================================
-# UNIVERS 004
-# SANTÉ, MÉDECINE, BEAUTÉ & BIEN-ÊTRE
-# ======================================================================
+# ============================================================
+# CONTEXTE COMPLET POUR GAÏRUS
+# ============================================================
 
-SERVICES_004 = {
-341: "Médecin généraliste",
-342: "Consultation médicale à domicile",
-343: "Téléconsultation médicale",
-344: "Consultation médicale en cabinet",
-345: "Suivi médical régulier",
-346: "Bilan de santé général",
-347: "Prévention médicale",
-348: "Conseil santé personnalisé",
-349: "Orientation médicale",
-350: "Service de permanence médicale",
+def get_brain_context() -> Dict[str, Any]:
 
-351: "Cardiologue",
-352: "Dermatologue",
-353: "Gynécologue",
-354: "Pédiatre",
-355: "Neurologue",
-356: "Gastro-entérologue",
-357: "Ophtalmologue",
-358: "ORL",
-359: "Pneumologue",
-360: "Rhumatologue",
-
-361: "Endocrinologue",
-362: "Oncologue",
-363: "Urologue",
-364: "Néphrologue",
-365: "Allergologue",
-366: "Médecin du sport",
-367: "Gériatre",
-368: "Médecin du travail",
-369: "Médecin urgentiste",
-370: "Médecin spécialisé en douleur",
-
-371: "Hôpital général",
-372: "Clinique privée",
-373: "Centre médical de proximité",
-374: "Centre de diagnostic",
-375: "Centre d'imagerie médicale",
-376: "Laboratoire d'analyses médicales",
-377: "Centre de vaccination",
-378: "Centre de soins spécialisés",
-379: "Centre de rééducation",
-380: "Service d'ambulance médicale",
-
-381: "Pharmacie physique",
-382: "Pharmacie en ligne",
-383: "Livraison de médicaments autorisés",
-384: "Conseil pharmaceutique",
-385: "Produits de santé générale",
-386: "Matériel médical",
-387: "Équipements de soins à domicile",
-388: "Produits de prévention santé",
-389: "Produits de premiers secours",
-390: "Assistance pharmaceutique",
-
-391: "Dentiste généraliste",
-392: "Orthodontiste",
-393: "Chirurgien-dentiste",
-394: "Implantologie dentaire",
-395: "Blanchiment dentaire professionnel",
-396: "Hygiène dentaire",
-397: "Prothèse dentaire",
-398: "Consultation dentaire",
-399: "Urgence dentaire",
-400: "Prévention bucco-dentaire",
-
-401: "Psychologue",
-402: "Psychothérapeute",
-403: "Psychiatre",
-404: "Coaching émotionnel",
-405: "Accompagnement personnel",
-406: "Gestion du stress",
-407: "Méditation guidée",
-408: "Accompagnement familial",
-409: "Soutien psychologique professionnel",
-410: "Prévention du mal-être",
-
-411: "Nutritionniste",
-412: "Diététicien",
-413: "Programme alimentaire personnalisé",
-414: "Coaching nutritionnel",
-415: "Analyse des habitudes alimentaires",
-416: "Plans alimentaires sportifs",
-417: "Nutrition familiale",
-418: "Conseil perte de poids encadré",
-419: "Nutrition préventive",
-420: "Éducation alimentaire",
-
-421: "Salle de sport",
-422: "Coach sportif personnel",
-423: "Entraînement à domicile",
-424: "Préparation physique professionnelle",
-425: "Fitness collectif",
-426: "Yoga",
-427: "Pilates",
-428: "Arts martiaux",
-429: "Coaching sportif en ligne",
-430: "Programmes de remise en forme",
-
-431: "Coiffeur professionnel",
-432: "Salon de beauté",
-433: "Esthéticienne",
-434: "Soins du visage",
-435: "Soins du corps",
-436: "Massage bien-être",
-437: "Spa",
-438: "Centre de relaxation",
-439: "Maquillage professionnel",
-440: "Conseil beauté personnalisé",
-
-441: "Coaching de vie",
-442: "Développement personnel",
-443: "Relaxation guidée",
-444: "Retraites bien-être",
-445: "Thérapies alternatives encadrées",
-446: "Accompagnement sommeil",
-447: "Gestion du mode de vie",
-448: "Programmes équilibre vie professionnelle/vie personnelle",
-449: "Conseils bien-être quotidien",
-450: "Expériences bien-être personnalisées",
-
-451: "Soins infirmiers à domicile",
-452: "Assistance aux personnes dépendantes",
-453: "Aide aux personnes âgées",
-454: "Accompagnement post-hospitalisation",
-455: "Kinésithérapie à domicile",
-456: "Rééducation à domicile",
-457: "Surveillance médicale à distance",
-458: "Assistance familiale santé",
-459: "Transport médical accompagné",
-460: "Coordination de soins",
-
-461: "Suivi santé numérique",
-462: "Carnet médical numérique",
-463: "Rappels prévention santé",
-464: "Programmes de prévention personnalisés",
-465: "Analyse d'habitudes de vie",
-466: "Objets connectés santé",
-467: "Suivi activité physique",
-468: "Conseils santé par intelligence artificielle",
-469: "Orientation vers professionnels adaptés",
-470: "Plateforme de santé intégrée"
-}
+    return {
+        "agent": "Gaïrus",
+        "system": ZYRVION_NAME,
+        "version": ZYRVION_VERSION,
+        "bible": BIBLE_ZYRVION,
+        "catalogue": get_catalogue(),
+    }
 
 
-# ======================================================================
-# UNIVERS 005
-# ÉDUCATION, FORMATION & CONNAISSANCE
-# ======================================================================
+# ============================================================
+# DIAGNOSTIC
+# ============================================================
 
-SERVICES_005 = {
-471: "École maternelle",
-472: "École primaire",
-473: "Collège",
-474: "Lycée",
-475: "Enseignement privé",
-476: "Enseignement international",
-477: "Soutien scolaire",
-478: "Accompagnement aux devoirs",
-479: "Préparation aux examens",
-480: "Cours particuliers scolaires",
+def diagnostic() -> Dict[str, Any]:
 
-481: "Université",
-482: "Institut supérieur",
-483: "École spécialisée",
-484: "Formation universitaire en ligne",
-485: "Cours universitaires privés",
-486: "Recherche académique",
-487: "Accompagnement mémoire et thèse",
-488: "Orientation universitaire",
-489: "Préparation concours supérieurs",
-490: "Programmes d'échanges éducatifs",
-
-491: "Formation informatique",
-492: "Formation mécanique",
-493: "Formation électrique",
-494: "Formation construction",
-495: "Formation agriculture",
-496: "Formation artisanale",
-497: "Formation cuisine professionnelle",
-498: "Formation couture",
-499: "Formation beauté et esthétique",
-500: "Formation métiers du commerce",
-
-501: "Formation management",
-502: "Formation leadership",
-503: "Formation communication professionnelle",
-504: "Formation vente",
-505: "Formation négociation",
-506: "Formation gestion de projet",
-507: "Formation entrepreneuriat",
-508: "Formation finance personnelle",
-509: "Formation marketing digital",
-510: "Formation ressources humaines",
-
-511: "Plateforme de cours en ligne",
-512: "Formation vidéo éducative",
-513: "Classes virtuelles",
-514: "Cours interactifs",
-515: "Tutoriels professionnels",
-516: "Bibliothèque numérique",
-517: "Coaching d'apprentissage",
-518: "Accompagnement scolaire numérique",
-519: "Évaluation des compétences en ligne",
-520: "Certification numérique",
-
-521: "Cours de langues étrangères",
-522: "Apprentissage anglais",
-523: "Apprentissage français",
-524: "Apprentissage langues africaines",
-525: "Apprentissage langues asiatiques",
-526: "Apprentissage langues européennes",
-527: "Traduction linguistique",
-528: "Interprétation simultanée",
-529: "Coaching expression orale",
-530: "Formation communication interculturelle",
-
-531: "Coaching personnel",
-532: "Coaching professionnel",
-533: "Formation confiance en soi",
-534: "Formation prise de parole",
-535: "Développement leadership personnel",
-536: "Gestion du temps",
-537: "Organisation personnelle",
-538: "Intelligence émotionnelle",
-539: "Créativité et innovation",
-540: "Développement des talents",
-
-541: "Formation musique",
-542: "Formation chant",
-543: "Formation danse",
-544: "Formation théâtre",
-545: "Formation cinéma",
-546: "Formation photographie",
-547: "Formation peinture",
-548: "Formation dessin",
-549: "Formation écriture",
-550: "Formation création artistique",
-
-551: "Formation mathématiques",
-552: "Formation physique",
-553: "Formation chimie",
-554: "Formation biologie",
-555: "Formation ingénierie",
-556: "Formation intelligence artificielle",
-557: "Formation robotique",
-558: "Formation cybersécurité",
-559: "Formation programmation",
-560: "Formation analyse de données",
-
-561: "Création d'entreprise",
-562: "Incubateur de startups",
-563: "Accélérateur entrepreneurial",
-564: "Formation business plan",
-565: "Formation gestion entreprise",
-566: "Accompagnement entrepreneurs",
-567: "Mentorat professionnel",
-568: "Conseil innovation",
-569: "Formation commerce international",
-570: "Formation stratégie commerciale",
-
-571: "Formation médicale",
-572: "Formation juridique",
-573: "Formation financière",
-574: "Formation immobilière",
-575: "Formation agricole avancée",
-576: "Formation environnementale",
-577: "Formation touristique",
-578: "Formation sportive",
-579: "Formation industrielle",
-580: "Formation métiers du futur",
-
-581: "Cours de traditions locales",
-582: "Formation artisanat traditionnel",
-583: "Apprentissage patrimoine culturel",
-584: "Transmission savoir-faire anciens",
-585: "Formation cuisine culturelle",
-586: "Formation histoire locale",
-587: "Formation arts traditionnels",
-588: "Documentation culturelle",
-589: "Archivage du patrimoine",
-590: "Enseignement intergénérationnel",
-
-591: "Éveil éducatif enfant",
-592: "Activités pédagogiques",
-593: "Centres de loisirs éducatifs",
-594: "Apprentissage précoce",
-595: "Coaching orientation jeunesse",
-596: "Programmes découverte métiers",
-597: "Formation numérique jeunesse",
-598: "Accompagnement scolaire personnalisé",
-599: "Préparation avenir professionnel",
-600: "Développement des jeunes talents"
-}
+    return {
+        "agent": "Gaïrus",
+        "zyrvion": ZYRVION_NAME,
+        "version": ZYRVION_VERSION,
+        "status": "ok",
+        "univers": len(UNIVERS),
+        "services": len(SERVICES),
+        "objectif": CATALOGUE_TARGET,
+        "architecture_niveaux": len(ARCHITECTURE),
+    }
 
 
-# ======================================================================
-# UNIVERS 006
-# TRANSPORT, MOBILITÉ & LOGISTIQUE
-# ======================================================================
+# ============================================================
+# INITIALISATION
+# ============================================================
 
-SERVICES_006 = {
-601: "Taxi traditionnel",
-602: "Taxi numérique",
-603: "VTC avec chauffeur",
-604: "Transport privé personnalisé",
-605: "Chauffeur personnel",
-606: "Location de voiture avec chauffeur",
-607: "Transport VIP",
-608: "Transport événementiel",
-609: "Transport touristique privé",
-610: "Transport de nuit sécurisé",
-
-611: "Bus urbain",
-612: "Bus interurbain",
-613: "Transport scolaire",
-614: "Transport universitaire",
-615: "Transport d'entreprise",
-616: "Navette privée",
-617: "Transport touristique collectif",
-618: "Transport événementiel collectif",
-619: "Transport adapté aux personnes à mobilité réduite",
-620: "Transport communautaire",
-
-621: "Location voiture courte durée",
-622: "Location voiture longue durée",
-623: "Location moto",
-624: "Location scooter",
-625: "Location vélo",
-626: "Location véhicule électrique",
-627: "Location véhicule professionnel",
-628: "Location véhicule de luxe",
-629: "Partage de véhicules",
-630: "Gestion de flotte automobile",
-
-631: "Livraison repas",
-632: "Livraison courses alimentaires",
-633: "Livraison colis particuliers",
-634: "Livraison documents urgents",
-635: "Livraison pharmacie autorisée",
-636: "Livraison commerces locaux",
-637: "Livraison express ville",
-638: "Livraison programmée",
-639: "Livraison de proximité",
-640: "Service coursier personnel",
-
-641: "Livraison entreprise à entreprise",
-642: "Distribution commerciale",
-643: "Gestion de tournées livraison",
-644: "Livraison grande quantité",
-645: "Livraison produits sensibles",
-646: "Livraison industrielle",
-647: "Livraison événementielle",
-648: "Gestion logistique des magasins",
-649: "Service de dernier kilomètre",
-650: "Optimisation des livraisons",
-
-651: "Transport de marchandises",
-652: "Transport routier",
-653: "Transport frigorifique",
-654: "Transport agricole",
-655: "Transport industriel",
-656: "Transport de matériaux",
-657: "Transport international",
-658: "Fret maritime",
-659: "Fret aérien",
-660: "Transit international",
-
-661: "Déménagement particulier",
-662: "Déménagement entreprise",
-663: "Emballage professionnel",
-664: "Déballage et installation",
-665: "Stockage temporaire",
-666: "Transport mobilier",
-667: "Transport objets fragiles",
-668: "Assistance changement de domicile",
-669: "Nettoyage après déménagement",
-670: "Organisation complète déménagement",
-
-671: "Garage automobile",
-672: "Révision véhicule",
-673: "Vidange automobile",
-674: "Réparation moteur",
-675: "Réparation électrique automobile",
-676: "Diagnostic automobile",
-677: "Entretien climatisation véhicule",
-678: "Lavage automobile",
-679: "Nettoyage intérieur véhicule",
-680: "Personnalisation automobile",
-
-681: "Vente automobile",
-682: "Achat automobile d'occasion",
-683: "Importation véhicule",
-684: "Expertise automobile",
-685: "Assurance automobile",
-686: "Assistance panne",
-687: "Remorquage véhicule",
-688: "Contrôle technique",
-689: "Location automobile professionnelle",
-690: "Conseil achat véhicule",
-
-691: "Mobilité électrique",
-692: "Location véhicules électriques",
-693: "Installation bornes de recharge",
-694: "Conseil mobilité durable",
-695: "Gestion intelligente du trafic",
-696: "Solutions mobilité entreprise",
-697: "Transport autonome futur",
-698: "Solutions drones logistiques",
-699: "Optimisation intelligente des déplacements",
-700: "Plateforme mobilité intégrée",
-
-701: "Transport médical accompagné",
-702: "Transport personnes âgées",
-703: "Transport personnes handicapées",
-704: "Transport scolaire sécurisé",
-705: "Transport animaux",
-706: "Transport événementiel",
-707: "Transport matériel professionnel",
-708: "Transport artistique",
-709: "Transport sportif",
-710: "Transport sécurisé spécialisé",
-
-711: "Billetterie transport",
-712: "Organisation voyage",
-713: "Assistance voyageur",
-714: "Réservation transport international",
-715: "Conseil itinéraire",
-716: "Accompagnement voyageurs",
-717: "Transport touristique",
-718: "Transport d'affaires",
-719: "Gestion déplacements professionnels",
-720: "Solutions voyage personnalisées",
-
-721: "Conseil logistique",
-722: "Gestion chaîne d'approvisionnement",
-723: "Gestion entrepôts",
-724: "Optimisation stocks",
-725: "Préparation commandes",
-726: "Suivi colis en temps réel",
-727: "Solutions logistiques entreprises",
-728: "Analyse données transport",
-729: "Automatisation logistique",
-730: "Plateforme logistique intelligente"
-}
+charger_services()
 
 
-# ======================================================================
-# UNIVERS 007
-# HABITAT, IMMOBILIER, CONSTRUCTION & ENVIRONNEMENT
-# ======================================================================
+# ============================================================
+# EXÉCUTION DIRECTE
+# ============================================================
 
-SERVICES_007 = {
-731: "Agence immobilière",
-732: "Vente de maisons",
-733: "Vente d'appartements",
-734: "Vente de terrains",
-735: "Location appartement",
-736: "Location maison",
-737: "Location bureau",
-738: "Location commerce",
-739: "Location courte durée",
-740: "Location longue durée",
+if __name__ == "__main__":
 
-741: "Gestion de biens immobiliers",
-742: "Administration immobilière",
-743: "Gestion locative",
-744: "Recherche de locataires",
-745: "État des lieux immobilier",
-746: "Conseil investissement immobilier",
-747: "Évaluation immobilière",
-748: "Expertise immobilière",
-749: "Gestion copropriété",
-750: "Conciergerie immobilière",
+    print("=" * 60)
+    print("ZYRVION BIBLE")
+    print("=" * 60)
 
-751: "Architecte résidentiel",
-752: "Architecte commercial",
-753: "Architecte industriel",
-754: "Architecture écologique",
-755: "Design architectural",
-756: "Plans de construction",
-757: "Modélisation 3D bâtiment",
-758: "Visualisation architecturale",
-759: "Étude d'aménagement espace",
-760: "Conseil conception immobilière",
+    infos = diagnostic()
 
-761: "Construction maison individuelle",
-762: "Construction immeuble",
-763: "Construction bâtiment commercial",
-764: "Construction industrielle",
-765: "Travaux publics",
-766: "Gros œuvre bâtiment",
-767: "Second œuvre bâtiment",
-768: "Rénovation bâtiment",
-769: "Extension maison",
-770: "Supervision chantier",
+    print(f"Agent                : {infos['agent']}")
+    print(f"Système              : {infos['zyrvion']}")
+    print(f"Version              : {infos['version']}")
+    print(f"Univers              : {infos['univers']}")
+    print(f"Services             : {infos['services']}")
+    print(
+        f"Objectif             : "
+        f"{infos['objectif']:,}".replace(",", " ")
+    )
+    print(
+        f"Architecture         : "
+        f"{infos['architecture_niveaux']} niveaux"
+    )
+    print("Catalogue universel  : ACTIF")
+    print("Vision milliard      : ACTIF")
+    print("Statut               : OK")
 
-771: "Maçonnerie",
-772: "Carrelage",
-773: "Peinture bâtiment",
-774: "Plâtrerie",
-775: "Menuiserie bois",
-776: "Menuiserie aluminium",
-777: "Métallerie",
-778: "Charpente",
-779: "Couverture toiture",
-780: "Isolation bâtiment",
+    fichier = exporter_catalogue()
 
-781: "Installation électrique maison",
-782: "Installation plomberie",
-783: "Installation climatisation",
-784: "Installation chauffage",
-785: "Installation ventilation",
-786: "Installation domotique",
-787: "Installation sécurité maison",
-788: "Installation panneaux solaires",
-789: "Installation équipements cuisine",
-790:
-}
+    print(f"Export               : {fichier}")
+    print("=" * 60)
