@@ -1,0 +1,41 @@
+cd ~/gairus
+
+echo "===== ORCHESTRATOR ====="
+sed -n '1,260p' core/orchestrator.py
+
+echo
+echo "===== MISSION ENGINE ====="
+sed -n '1,260p' core/mission_engine.py
+
+echo
+echo "===== MISSION ORCHESTRATOR ====="
+sed -n '1,260p' core/mission_orchestrator.py
+
+echo
+echo "===== PLANNER ====="
+sed -n '1,260p' core/planner.py
+echo "===== EXECUTOR ====="
+sed -n '1,260p' core/executor.py
+
+echo
+echo "===== VERIFIER ====="
+sed -n '1,260p' core/verifier.py
+
+echo
+echo "===== AGENT RUNTIME ====="
+sed -n '1,260p' core/agent_runtime.py
+
+echo
+echo "===== TOOL RUNTIME ====="
+sed -n '1,260p' core/tool_runtime.py
+echo "===== FINAL WIRING ====="
+sed -n '1,320p' core/final_wiring.py
+
+echo
+echo "===== FULL BOOTSTRAP ====="
+sed -n '1,320p' core/full_bootstrap.py
+
+echo
+echo "===== GAIRUS OPERATIONS ====="
+sed -n '1,320p' core/gairus_operations.py
+

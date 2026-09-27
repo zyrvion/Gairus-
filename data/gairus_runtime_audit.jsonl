@@ -1,0 +1,2 @@
+{"id": "33a3b00c-85e5-4c70-a2f7-47965af78fea", "timestamp": "2026-09-27T05:24:56.634518+00:00", "event": "memory_written", "actor_id": null, "mission_id": null, "status": "ok", "metadata": {"key": "test.gairus", "category": "test"}}
+{"id": "656e8af3-3898-41a4-8ba0-29ec8a3e778c", "timestamp": "2026-09-27T05:42:57.415815+00:00", "event": "memory_written", "actor_id": null, "mission_id": null, "status": "ok", "metadata": {"key": "gairus.integration.test", "category": "integration"}}
