@@ -1,0 +1,461 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+import uuid
+from dataclasses import dataclass, asdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
+
+
+ROOT = Path(__file__).resolve().parent.parent
+DATA = ROOT / "data"
+DATA.mkdir(parents=True, exist_ok=True)
+
+DB_PATH = DATA / "gairus_capabilities.db"
+
+
+def now():
+    return datetime.now(timezone.utc).isoformat()
+
+
+@dataclass
+class Capability:
+    id: int
+    name: str
+    domain: str
+    description: str
+    enabled: bool = True
+    requires_approval: bool = False
+    handler: str | None = None
+
+
+class GairusCapabilityMatrix:
+    """
+    MATRICE CENTRALE DES 200 CAPACITÉS DE GAÏRUS.
+
+    Cette couche ne remplace aucun moteur existant.
+    Elle donne à Gaïrus une carte unique de ses capacités,
+    leurs permissions et leurs points d'intégration.
+
+    Les capacités réelles sont exécutées par les connecteurs,
+    outils, agents, APIs et moteurs déjà présents dans Gaïrus.
+    """
+
+    def __init__(self, runtime=None):
+        self.runtime = runtime
+        self.root = ROOT
+        self.db_path = DB_PATH
+        self.handlers: dict[str, Callable] = {}
+        self.capabilities: dict[int, Capability] = {}
+
+        self._init_database()
+        self._build_matrix()
+        self._bind_runtime()
+
+    # =========================================================
+    # DATABASE
+    # =========================================================
+
+    def _connect(self):
+        conn = sqlite3.connect(
+            str(self.db_path),
+            check_same_thread=False,
+        )
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _init_database(self):
+        conn = self._connect()
+
+        try:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS capability_runs (
+                    id TEXT PRIMARY KEY,
+                    capability_id INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    actor TEXT,
+                    input_data TEXT,
+                    output_data TEXT,
+                    error TEXT,
+                    created_at TEXT NOT NULL,
+                    finished_at TEXT
+                )
+                """
+            )
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS capability_settings (
+                    capability_id INTEGER PRIMARY KEY,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    requires_approval INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+
+            conn.commit()
+
+        finally:
+            conn.close()
+
+    # =========================================================
+    # MATRIX
+    # =========================================================
+
+    def _build_matrix(self):
+
+        definitions = [
+
+            # =================================================
+            # 1-15 TEXTE
+            # =================================================
+
+            (1, "Rédiger des emails professionnels", "texte"),
+            (2, "Écrire des articles de blog", "texte"),
+            (3, "Générer des scripts de vidéos", "texte"),
+            (4, "Rédiger des contrats et documents légaux", "texte"),
+            (5, "Créer des posts réseaux sociaux", "texte"),
+            (6, "Écrire du contenu publicitaire", "texte"),
+            (7, "Résumer des documents longs", "texte"),
+            (8, "Rédiger des rapports d'activité", "texte"),
+            (9, "Créer des présentations PowerPoint", "texte"),
+            (10, "Écrire des messages SMS et WhatsApp", "texte"),
+            (11, "Générer des FAQ automatiques", "texte"),
+            (12, "Rédiger des CV et lettres de motivation", "texte"),
+            (13, "Créer des scripts d'appels commerciaux", "texte"),
+            (14, "Rédiger des notes de réunion", "texte"),
+            (15, "Générer des titres et accroches marketing", "texte"),
+
+            # =================================================
+            # 16-25 IMAGES
+            # =================================================
+
+            (16, "Créer des logos", "image"),
+            (17, "Générer des visuels publicitaires", "image"),
+            (18, "Créer des illustrations pour articles", "image"),
+            (19, "Créer des maquettes d'interface", "image"),
+            (20, "Créer des images de profil et avatars", "image"),
+            (21, "Générer des infographies", "image"),
+            (22, "Créer des bannières réseaux sociaux", "image"),
+            (23, "Générer des variations d'une image", "image"),
+            (24, "Créer des images de produits", "image"),
+            (25, "Générer des fonds d'écran personnalisés", "image"),
+
+            # =================================================
+            # 26-35 VIDEO
+            # =================================================
+
+            (26, "Créer des vidéos publicitaires courtes", "video"),
+            (27, "Générer des animations de logo", "video"),
+            (28, "Créer des vidéos explicatives", "video"),
+            (29, "Assembler des montages automatiquement", "video"),
+            (30, "Générer des sous-titres automatiques", "video"),
+            (31, "Créer des vidéos TikTok et Reels", "video"),
+            (32, "Ajouter des voix off synthétiques", "video"),
+            (33, "Générer des transitions et effets vidéo", "video"),
+            (34, "Créer des vidéos à partir d'images fixes", "video"),
+            (35, "Compresser et convertir des vidéos", "video"),
+
+            # =================================================
+            # 36-50 AUDIO
+            # =================================================
+
+            (36, "Transcrire un enregistrement audio", "audio"),
+            (37, "Transcrire un appel téléphonique", "audio"),
+            (38, "Générer une voix off synthétique", "audio"),
+            (39, "Cloner une voix avec consentement", "audio"),
+            (40, "Traduire un audio", "audio"),
+            (41, "Créer un podcast automatique", "audio"),
+            (42, "Générer une musique de fond", "audio"),
+            (43, "Nettoyer le bruit d'un enregistrement", "audio"),
+            (44, "Résumer un appel", "audio"),
+            (45, "Détecter les différents locuteurs", "audio"),
+            (46, "Convertir du texte en audiobook", "audio"),
+            (47, "Générer des jingles publicitaires", "audio"),
+            (48, "Analyser le ton émotionnel d'une voix", "audio"),
+            (49, "Créer des réponses vocales automatiques", "audio"),
+            (50, "Synchroniser une voix avec une vidéo", "audio"),
+
+            # =================================================
+            # 51-65 DEVELOPPEMENT
+            # =================================================
+
+            (51, "Écrire du code multi-langages", "development"),
+            (52, "Créer une application web complète", "development"),
+            (53, "Créer une application mobile", "development"),
+            (54, "Corriger des bugs", "development"),
+            (55, "Déployer une application", "development"),
+            (56, "Créer une base de données", "development"),
+            (57, "Concevoir une API", "development"),
+            (58, "Générer une interface utilisateur", "development"),
+            (59, "Automatiser les tests logiciels", "development"),
+            (60, "Créer un site e-commerce", "development"),
+            (61, "Intégrer un système de paiement", "development"),
+            (62, "Créer un dashboard analytique", "development"),
+            (63, "Générer de la documentation technique", "development"),
+            (64, "Mettre à jour une application", "development"),
+            (65, "Créer un chatbot personnalisé", "development"),
+
+            # =================================================
+            # 66-85 AUTOMATISATION
+            # =================================================
+
+            (66, "Remplir des formulaires automatiquement", "automation"),
+            (67, "Naviguer sur un site web", "automation"),
+            (68, "Réserver un billet ou rendez-vous", "automation"),
+            (69, "Comparer des prix", "automation"),
+            (70, "Surveiller un site web", "automation"),
+            (71, "Automatiser les tâches répétitives", "automation"),
+            (72, "Extraire des données d'un site", "automation"),
+            (73, "Planifier des tâches récurrentes", "automation"),
+            (74, "Déclencher une action conditionnelle", "automation"),
+            (75, "Synchroniser plusieurs outils", "automation"),
+            (76, "Créer des workflows multi-étapes", "automation"),
+            (77, "Envoyer des rappels automatiques", "automation"),
+            (78, "Générer et envoyer des factures", "automation"),
+            (79, "Suivre des livraisons", "automation"),
+            (80, "Automatiser la saisie de données", "automation"),
+            (81, "Faire des achats selon des critères", "automation"),
+            (82, "Gérer un panier automatiquement", "automation"),
+            (83, "Programmer des publications", "automation"),
+            (84, "Nettoyer et organiser des fichiers", "automation"),
+            (85, "Convertir des fichiers", "automation"),
+
+            # =================================================
+            # 86-100 EMAIL
+            # =================================================
+
+            (86, "Lire et trier les emails", "email"),
+            (87, "Répondre automatiquement aux emails", "email"),
+            (88, "Détecter les emails prioritaires", "email"),
+            (89, "Archiver les emails indésirables", "email"),
+            (90, "Envoyer des emails personnalisés en masse", "email"),
+            (91, "Créer des brouillons pour validation", "email"),
+            (92, "Extraire les pièces jointes", "email"),
+            (93, "Résumer une boîte de réception", "email"),
+            (94, "Détecter phishing et spam", "email"),
+            (95, "Programmer un email", "email"),
+            (96, "Relancer automatiquement un contact", "email"),
+            (97, "Créer des règles de classement", "email"),
+            (98, "Fusionner plusieurs boîtes mail", "email"),
+            (99, "Transformer un rendez-vous email en événement", "email"),
+            (100, "Générer des réponses types intelligentes", "email"),
+
+            # =================================================
+            # 101-115 COMMUNICATION
+            # =================================================
+
+            (101, "Passer des appels téléphoniques automatisés", "communication"),
+            (102, "Répondre aux appels entrants avec une voix IA", "communication"),
+            (103, "Envoyer des SMS automatiques", "communication"),
+            (104, "Gérer WhatsApp Business", "communication"),
+            (105, "Transférer un appel à un humain", "communication"),
+            (106, "Qualifier des prospects par téléphone", "communication"),
+            (107, "Prendre des rendez-vous par téléphone", "communication"),
+            (108, "Envoyer des notifications push", "communication"),
+            (109, "Gérer plusieurs conversations simultanément", "communication"),
+            (110, "Traduire une conversation en temps réel", "communication"),
+            (111, "Détecter l'intention d'un message", "communication"),
+            (112, "Escalader automatiquement une réclamation", "communication"),
+            (113, "Envoyer des messages Slack et Teams", "communication"),
+            (114, "Créer des sondages et collecter les réponses", "communication"),
+            (115, "Gérer un service client 24h/24", "communication"),
+
+            # =================================================
+            # 116-130 RECHERCHE
+            # =================================================
+
+            (116, "Faire des recherches web en temps réel", "research"),
+            (117, "Surveiller l'actualité d'un secteur", "research"),
+            (118, "Suivre automatiquement la concurrence", "research"),
+            (119, "Vérifier des faits", "research"),
+            (120, "Résumer plusieurs sources", "research"),
+            (121, "Détecter des opportunités de marché", "research"),
+            (122, "Analyser les avis clients", "research"),
+            (123, "Suivre les mentions d'une marque", "research"),
+            (124, "Comparer produits et services", "research"),
+            (125, "Générer une veille concurrentielle", "research"),
+            (126, "Rechercher partenaires et fournisseurs", "research"),
+            (127, "Analyser les tendances sociales", "research"),
+            (128, "Trouver des influenceurs", "research"),
+            (129, "Vérifier la réputation d'une entité", "research"),
+            (130, "Suivre les évolutions réglementaires", "research"),
+
+            # =================================================
+            # 131-140 FICHIERS / DONNEES
+            # =================================================
+
+            (131, "Organiser automatiquement les dossiers", "data"),
+            (132, "Extraire du texte par OCR", "data"),
+            (133, "Fusionner plusieurs documents", "data"),
+            (134, "Diviser un document", "data"),
+            (135, "Nettoyer des données mal formatées", "data"),
+            (136, "Détecter les doublons", "data"),
+            (137, "Sauvegarder automatiquement des fichiers", "data"),
+            (138, "Chiffrer et sécuriser des documents", "data"),
+            (139, "Transformer Excel en base de données", "data"),
+            (140, "Générer des rapports depuis des données", "data"),
+
+            # =================================================
+            # 141-155 MARKETING
+            # =================================================
+
+            (141, "Planifier un calendrier éditorial", "marketing"),
+            (142, "Publier sur plusieurs réseaux", "marketing"),
+            (143, "Répondre automatiquement aux commentaires", "marketing"),
+            (144, "Analyser les performances sociales", "marketing"),
+            (145, "Générer des hashtags", "marketing"),
+            (146, "Identifier les horaires de publication", "marketing"),
+            (147, "Créer des campagnes publicitaires", "marketing"),
+            (148, "Suivre le ROI publicitaire", "marketing"),
+            (149, "Segmenter une audience", "marketing"),
+            (150, "Générer des newsletters", "marketing"),
+            (151, "Gérer une liste de diffusion", "marketing"),
+            (152, "Créer des landing pages", "marketing"),
+            (153, "Effectuer des tests A/B", "marketing"),
+            (154, "Générer des rapports marketing", "marketing"),
+            (155, "Automatiser les relances clients", "marketing"),
+
+            # =================================================
+            # 156-165 FINANCE
+            # =================================================
+
+            (156, "Suivre les dépenses", "finance"),
+            (157, "Générer factures et devis", "finance"),
+            (158, "Relancer les factures impayées", "finance"),
+            (159, "Faire des rapprochements bancaires", "finance"),
+            (160, "Suivre la trésorerie", "finance"),
+            (161, "Générer des prévisions financières", "finance"),
+            (162, "Traiter des paiements en ligne", "finance"),
+            (163, "Détecter des transactions frauduleuses", "finance"),
+            (164, "Calculer des commissions", "finance"),
+            (165, "Générer des déclarations fiscales de base", "finance"),
+
+            # =================================================
+            # 166-172 IOT
+            # =================================================
+
+            (166, "Allumer et éteindre des appareils", "iot"),
+            (167, "Surveiller des capteurs", "iot"),
+            (168, "Créer des routines domotiques", "iot"),
+            (169, "Recevoir des alertes de sécurité", "iot"),
+            (170, "Contrôler des caméras connectées", "iot"),
+            (171, "Gérer automatiquement l'éclairage", "iot"),
+            (172, "Contrôler la température", "iot"),
+
+            # =================================================
+            # 173-183 ORGANISATION
+            # =================================================
+
+            (173, "Gérer un agenda", "organization"),
+            (174, "Planifier des réunions", "organization"),
+            (175, "Envoyer des rappels d'échéances", "organization"),
+            (176, "Créer des listes de tâches", "organization"),
+            (177, "Prioriser les tâches", "organization"),
+            (178, "Suivre un projet", "organization"),
+            (179, "Coordonner plusieurs personnes", "organization"),
+            (180, "Générer un rétroplanning", "organization"),
+            (181, "Détecter les conflits d'agenda", "organization"),
+            (182, "Réserver des salles et ressources", "organization"),
+            (183, "Envoyer des invitations", "organization"),
+
+            # =================================================
+            # 184-192 MEMOIRE
+            # =================================================
+
+            (184, "Se souvenir des préférences utilisateur", "memory"),
+            (185, "Apprendre le style de communication", "memory"),
+            (186, "Adapter les réponses au contexte passé", "memory"),
+            (187, "Mémoriser les processus internes", "memory"),
+            (188, "Améliorer ses réponses avec le temps", "memory"),
+            (189, "Personnaliser selon chaque interlocuteur", "memory"),
+            (190, "Se souvenir des décisions", "memory"),
+            (191, "Reconnaître les habitudes de travail", "memory"),
+            (192, "Ajuster les recommandations selon les résultats", "memory"),
+
+            # =================================================
+            # 193-200 SECURITE
+            # =================================================
+
+            (193, "Demander une validation humaine", "security"),
+            (194, "Journaliser toutes les actions", "security"),
+            (195, "Détecter les activités suspectes", "security"),
+            (196, "Limiter les accès selon les rôles", "security"),
+            (197, "Chiffrer les échanges de données", "security"),
+            (198, "Alerter en cas d'erreur critique", "security"),
+            (199, "Annuler une action récente", "security"),
+            (200, "Générer un rapport d'audit", "security"),
+        ]
+
+        approval_ids = {
+            4, 39, 55, 61, 66, 68, 72, 78,
+            81, 83, 87, 90, 95, 101, 102, 103,
+            104, 105, 107, 108, 113, 147, 155,
+            157, 158, 159, 162, 166, 169, 170,
+            182, 193, 196, 197, 199,
+        }
+
+        for capability_id, name, domain in definitions:
+
+            description = (
+                f"Capacité Gaïrus #{capability_id}: "
+                f"{name}."
+            )
+
+            capability = Capability(
+                id=capability_id,
+                name=name,
+                domain=domain,
+                description=description,
+                enabled=True,
+                requires_approval=(
+                    capability_id in approval_ids
+                ),
+                handler=self._default_handler_name(
+                    capability_id
+                ),
+            )
+
+            self.capabilities[
+                capability_id
+            ] = capability
+
+            self._load_settings(
+                capability
+            )
+
+    def _default_handler_name(self, capability_id):
+        return (
+            f"capability_{capability_id}"
+        )
+
+    def _load_settings(self, capability):
+        conn = self._connect()
+
+        try:
+            row = conn.execute(            row = conn.execute(
+                """
+                SELECT enabled, requires_approval
+                FROM capability_settings
+                WHERE capability_id = ?
+                """,
+                (capability.id,),
+            ).fetchone()
+
+            if row is not None:
+                capability.enabled = bool(row[0])
+                capability.requires_approval = bool(row[1])
+
+        finally:
+            conn.close()
+                """
+                SELECT enabled, requires_approval
+                FROM capability_settings
+                WHERE capability_id = ?
+                """,
+                (capability.id,),
+           
