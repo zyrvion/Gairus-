@@ -1528,15 +1528,43 @@ def stop_autonomy_runtime():
     return True
 
 def runtime_status():
-    return {
-        "running": bool(_runtime_thread and _runtime_thread.is_alive()),
-        "autonomy": os.getenv("GAIRUS_AUTONOMY", "false").lower() == "true",
-        "approvals": os.getenv("GAIRUS_APPROVALS", "true").lower() == "true",
-    }
+    global _AUTONOMY_SCHEDULER
 
-# ============================================================
-# COMPATIBILITE API GAÏRUS
-# ============================================================
+    scheduler = _AUTONOMY_SCHEDULER
+    running = False
+    jobs = []
+
+    if scheduler is not None:
+        try:
+            running = bool(scheduler.running)
+        except Exception:
+            running = False
+
+        try:
+            jobs = [
+                {
+                    "id": job.id,
+                    "next_run": (
+                        job.next_run_time.isoformat()
+                        if job.next_run_time
+                        else None
+                    ),
+                }
+                for job in scheduler.get_jobs()
+            ]
+        except Exception:
+            jobs = []
+
+    return {
+        "ok": True,
+        "running": running,
+        "scheduler": (
+            type(scheduler).__name__
+            if scheduler is not None
+            else None
+        ),
+        "jobs": jobs,
+    }
 
 def ai_plan_mission(prompt):
     """Construit un plan autonome exploitable par le moteur Gaïrus."""
