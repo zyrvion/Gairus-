@@ -4,7 +4,7 @@ from core.final_external_runtime import get_final_gairus
 from core.gairus_operations import GairusOperations
 from core.autonomous_integration import AutonomousIntegration
 from core.autonomous_runtime_bridge import integrate_autonomous_runtime
-
+from core.gairus_cognitive_evolution import get_cognitive_evolution
 
 _instance = None
 
@@ -40,7 +40,28 @@ def get_operations_gairus():
 
         agent.autonomous_runtime = bridge
         runtime.autonomous_runtime_bridge = bridge
+        cognitive = get_cognitive_evolution(runtime)
+        agent.cognitive = cognitive
+        runtime.cognitive = cognitive
 
+        try:
+            cognitive.set_identity(
+                "gairus.name",
+                "Gaïrus",
+                "identity",
+            )
+            cognitive.set_identity(
+                "gairus.role",
+                "Agent IA autonome généraliste",
+                "identity",
+            )
+            cognitive.set_identity(
+                "gairus.creator",
+                "Arta",
+                "creator",
+            )
+        except Exception:
+            pass
         # Santé.
         health = getattr(runtime, "health", None)
 
