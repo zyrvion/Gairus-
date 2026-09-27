@@ -7,7 +7,7 @@ from core.autonomous_runtime_bridge import integrate_autonomous_runtime
 from core.gairus_cognitive_evolution import get_cognitive_evolution
 from core.gairus_cognitive_evolution_bridge import integrate_cognitive_evolution
 from core.gairus_cognitive_context import integrate_cognitive_context
-from core.gairus_slack_cognitive import integrate_slack_cognitive
+
 _instance = None
 
 
@@ -54,10 +54,7 @@ def get_operations_gairus():
         cognitive_context = integrate_cognitive_context(runtime)
         agent.cognitive_context = cognitive_context
         runtime.cognitive_context = cognitive_context
-        slack_cognitive = integrate_slack_cognitive(runtime)
-        agent.slack_cognitive = slack_cognitive
-        runtime.slack_cognitive = slack_cognitive       
- try:
+        try:
             if hasattr(health, "register"):
                 health.register(
                     "self_evolution",
