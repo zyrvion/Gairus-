@@ -1,4 +1,4 @@
-from provider_catalog import PROVIDERS
+from provider_catalog import PROVIDERS as PROVIDER_CATALOG
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -7,7 +7,7 @@ import requests
 
 TIMEOUT = int(os.getenv("GAIRUS_PROVIDER_TIMEOUT", "90"))
 
-PROVIDERS = {
+AI_PROVIDERS = {
     "gemini": {
         "env": "GOOGLE_API_KEY",
         "base": "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -48,7 +48,7 @@ def call_openai_provider(name, prompt, system=None):
     # Recherche le fournisseur dans le catalogue réel.
     cfg = next(
         (
-            item for item in PROVIDERS
+            item for item in PROVIDER_CATALOG
             if item.get("id") == name
         ),
         None,
@@ -154,7 +154,7 @@ def ask_with_fallback(prompt, system=None):
 
     for provider in order:
         try:
-            cfg = next((item for item in PROVIDERS if item.get("id") == provider), None)
+            cfg = AI_PROVIDERS.get(provider)
             if not cfg:
                 continue
             key_name = cfg.get("env")
@@ -325,7 +325,7 @@ def discover_provider_catalog():
 
     discovered = []
 
-    for provider in PROVIDERS:
+    for provider in PROVIDER_CATALOG:
         env_name = provider.get("env")
 
         if not env_name:
@@ -363,7 +363,7 @@ def provider_network_status():
 
     result = []
 
-    for provider in PROVIDERS:
+    for provider in PROVIDER_CATALOG:
         env_name = provider.get("env")
         configured = bool(
             os.getenv(env_name, "").strip()
@@ -389,10 +389,10 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
 try:
-    from provider_catalog import PROVIDERS
+    from provider_catalog import PROVIDERS as PROVIDER_CATALOG
     from resilience import RESILIENT_ROUTER
 except Exception:
-    PROVIDERS = []
+    PROVIDER_CATALOG = []
     RESILIENT_ROUTER = None
 
 
@@ -406,7 +406,7 @@ def _catalog_provider_configured(provider):
 
 def configured_provider_catalog():
     return [
-        p for p in PROVIDERS
+        p for p in PROVIDER_CATALOG
         if _catalog_provider_configured(p)
     ]
 
@@ -414,7 +414,7 @@ def configured_provider_catalog():
 def provider_network():
     result = []
 
-    for p in PROVIDERS:
+    for p in PROVIDER_CATALOG:
         result.append({
             "id": p.get("id"),
             "name": p.get("name"),
@@ -484,7 +484,7 @@ def network_health():
 
     return {
         "ok": True,
-        "total": len(PROVIDERS),
+        "total": len(PROVIDER_CATALOG),
         "configured": len(configured),
         "providers": [
             {

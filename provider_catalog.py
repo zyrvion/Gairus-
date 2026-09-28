@@ -66,18 +66,7 @@ PROVIDERS = [
         "pricing": "free_tier",
         "priority": 35,
     },
-    {
-        "id": "huggingface",
-        "name": "Hugging Face",
-        "env": "HF_TOKEN",
-        "model_env": "HF_MODEL",
-        "default_model": "Qwen/Qwen3-32B",
-        "type": "gateway",
-        "protocol": "huggingface",
-        "capabilities": ["text", "code", "vision"],
-        "pricing": "free_tier",
-        "priority": 40,
-    },
+
     {
         "id": "cloudflare",
         "name": "Cloudflare Workers AI",
