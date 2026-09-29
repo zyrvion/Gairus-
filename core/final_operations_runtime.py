@@ -59,8 +59,10 @@ def get_operations_gairus():
         cognitive_context = integrate_cognitive_context(runtime)
         agent.cognitive_context = cognitive_context
         runtime.cognitive_context = cognitive_context
+        health = getattr(runtime, "health", None)
+
         try:
-            if hasattr(health, "register"):
+            if health is not None and hasattr(health, "register"):
                 health.register(
                     "self_evolution",
                     evolution,
@@ -86,7 +88,6 @@ def get_operations_gairus():
         except Exception:
             pass
         # Santé.
-        health = getattr(runtime, "health", None)
 
         if health is not None:
             try:

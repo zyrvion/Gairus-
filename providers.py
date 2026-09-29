@@ -228,7 +228,7 @@ try:
     }
 
     for _provider_name in _RESILIENT_PROVIDER_NAMES:
-        if not any(item.get("id") == _provider_name for item in PROVIDERS):
+        if not any(item.get("id") == _provider_name for item in PROVIDER_CATALOG):
             continue
 
         try:
@@ -296,7 +296,21 @@ def ask_resilient(prompt, system=None, preferred=None):
         )
 
         if result.get("ok"):
-            return result.get("result")
+            provider_name = result.get("provider")
+
+            return {
+                "provider": provider_name,
+                "model": next(
+                    (
+                        item.get("default_model")
+                        for item in PROVIDER_CATALOG
+                        if item.get("id") == provider_name
+                    ),
+                    None,
+                ),
+                "reply": result.get("result"),
+                "errors": [],
+            }
 
         # Dernier filet de sécurité :
         # retour au système historique.

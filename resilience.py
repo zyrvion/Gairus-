@@ -1,14 +1,28 @@
+from __future__ import annotations
+
 from dotenv import load_dotenv
+
 load_dotenv()
 
 """
 GAÏRUS — Resilient Provider Router
-Fallback multi-fournisseurs, retries, timeouts, cooldowns et circuit breaker.
+
+Routeur multi-fournisseurs :
+- ordre de priorité
+- retry par fournisseur
+- timeout
+- cooldown
+- circuit breaker léger
+- bascule automatique vers le fournisseur suivant
+- fournisseur préféré optionnel
+- aucun nombre maximum de fournisseurs imposé
+
+Le routeur ne connaît pas les clés API.
+Les fournisseurs sont enregistrés par providers.py.
 """
 
-import os
-import time
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
@@ -16,17 +30,27 @@ from typing import Any, Callable, Dict, List, Optional
 @dataclass
 class ProviderState:
     name: str
+
     capabilities: set = field(default_factory=set)
+
     priority: int = 100
+
     timeout: float = 45.0
-    max_retries: int = 2
-    cooldown: float = 30.0
+
+    max_retries: int = 1
+
+    cooldown: float = 20.0
 
     failures: int = 0
+
     successes: int = 0
+
     last_error: Optional[str] = None
+
     last_failure: float = 0.0
+
     last_success: float = 0.0
+
     disabled: bool = False
 
     def available(self) -> bool:
@@ -36,37 +60,44 @@ class ProviderState:
         if self.last_failure <= 0:
             return True
 
-        return (time.time() - self.last_failure) >= self.cooldown
+        elapsed = time.time() - self.last_failure
+
+        return elapsed >= self.cooldown
 
 
 class ResilientProviderRouter:
     """
     Routeur central de Gaïrus.
 
-    Principe :
+    Exemple :
 
-        fournisseur A
-             ↓
-          retry
-             ↓
-        fournisseur B
-             ↓
-          retry
-             ↓
-        fournisseur C
+        Gemini
+           ↓ échec
+        Groq
+           ↓ échec
+        Mistral
+           ↓ échec
+        DeepSeek
+           ↓
+        succès
 
-    Un fournisseur qui échoue plusieurs fois est temporairement
-    placé en cooldown afin d'éviter de ralentir toute la mission.
+    Le routeur continue automatiquement avec le fournisseur
+    suivant lorsqu'un fournisseur échoue.
+
+    Il n'existe volontairement aucun nombre maximal global
+    de fournisseurs.
     """
 
     def __init__(self):
         self.providers: Dict[str, ProviderState] = {}
+
         self.handlers: Dict[str, Callable[..., Any]] = {}
+
         self.lock = threading.RLock()
 
-    # ---------------------------------------------------------
+    # ========================================================
     # ENREGISTREMENT
-    # ---------------------------------------------------------
+    # ========================================================
 
     def register(
         self,
@@ -75,50 +106,156 @@ class ResilientProviderRouter:
         capabilities=None,
         priority: int = 100,
         timeout: float = 45.0,
-        max_retries: int = 2,
-        cooldown: float = 30.0,
+        max_retries: int = 1,
+        cooldown: float = 20.0,
     ):
-        capabilities = set(capabilities or {"text"})
+        if not name:
+            raise ValueError("Nom de fournisseur obligatoire.")
+
+        if not callable(handler):
+            raise ValueError(
+                f"{name}: handler fournisseur invalide."
+            )
+
+        capabilities = set(
+            capabilities or {"text"}
+        )
 
         with self.lock:
+            existing = self.providers.get(name)
+
+            if existing:
+                failures = existing.failures
+                successes = existing.successes
+                last_error = existing.last_error
+                last_failure = existing.last_failure
+                last_success = existing.last_success
+                disabled = existing.disabled
+            else:
+                failures = 0
+                successes = 0
+                last_error = None
+                last_failure = 0.0
+                last_success = 0.0
+                disabled = False
+
             self.providers[name] = ProviderState(
                 name=name,
                 capabilities=capabilities,
-                priority=priority,
-                timeout=timeout,
-                max_retries=max_retries,
-                cooldown=cooldown,
+                priority=int(priority),
+                timeout=float(timeout),
+                max_retries=max(0, int(max_retries)),
+                cooldown=max(0.0, float(cooldown)),
+                failures=failures,
+                successes=successes,
+                last_error=last_error,
+                last_failure=last_failure,
+                last_success=last_success,
+                disabled=disabled,
             )
 
             self.handlers[name] = handler
 
-    # ---------------------------------------------------------
-    # DISPONIBILITÉ
-    # ---------------------------------------------------------
+    # ========================================================
+    # CONTRÔLE
+    # ========================================================
 
-    def _candidates(self, capability: str) -> List[ProviderState]:
+    def enable(self, name: str):
+        with self.lock:
+            provider = self.providers.get(name)
+
+            if not provider:
+                raise KeyError(
+                    f"Fournisseur inconnu : {name}"
+                )
+
+            provider.disabled = False
+
+    def disable(self, name: str):
+        with self.lock:
+            provider = self.providers.get(name)
+
+            if not provider:
+                raise KeyError(
+                    f"Fournisseur inconnu : {name}"
+                )
+
+            provider.disabled = True
+
+    def reset_provider(self, name: str):
+        with self.lock:
+            provider = self.providers.get(name)
+
+            if not provider:
+                raise KeyError(
+                    f"Fournisseur inconnu : {name}"
+                )
+
+            provider.failures = 0
+            provider.last_error = None
+            provider.last_failure = 0.0
+            provider.disabled = False
+
+    # ========================================================
+    # CANDIDATS
+    # ========================================================
+
+    @staticmethod
+    def _provider_configured(name: str) -> bool:
+        try:
+            from provider_catalog import PROVIDERS
+
+            cfg = next(
+                (
+                    item
+                    for item in PROVIDERS
+                    if item.get("id") == name
+                ),
+                None,
+            )
+
+            if not cfg:
+                return False
+
+            env_name = cfg.get("env")
+
+            if not env_name:
+                return False
+
+            return bool(
+                __import__("os").getenv(env_name, "").strip()
+            )
+
+        except Exception:
+            return False
+
+    def _candidates(
+        self,
+        capability: str,
+    ) -> List[ProviderState]:
+
         with self.lock:
             providers = [
-                p
-                for p in self.providers.values()
-                if capability in p.capabilities
-                and p.available()
-                and self._provider_configured(p.name)
+                provider
+                for provider in self.providers.values()
+                if capability in provider.capabilities
+                and provider.available()
+                and provider.name in self.handlers
             ]
 
         providers.sort(
-            key=lambda p: (
-                p.priority,
-                p.failures,
-                -p.successes,
+            key=lambda provider: (
+                provider.priority,
+                provider.failures,
+                -provider.successes,
             )
         )
 
         return providers
 
-    # ---------------------------------------------------------
-    # EXÉCUTION
-    # ---------------------------------------------------------
+    # ========================================================
+    # APPEL
+    # ========================================================
 
     def call(
         self,
@@ -128,14 +265,16 @@ class ResilientProviderRouter:
         **kwargs,
     ) -> Dict[str, Any]:
 
-        candidates = self._candidates(capability)
+        candidates = self._candidates(
+            capability
+        )
 
         if preferred:
             preferred_provider = next(
                 (
-                    p
-                    for p in candidates
-                    if p.name == preferred
+                    provider
+                    for provider in candidates
+                    if provider.name == preferred
                 ),
                 None,
             )
@@ -144,76 +283,129 @@ class ResilientProviderRouter:
                 candidates = [
                     preferred_provider
                 ] + [
-                    p
-                    for p in candidates
-                    if p.name != preferred
+                    provider
+                    for provider in candidates
+                    if provider.name != preferred
                 ]
 
         if not candidates:
             return {
                 "ok": False,
                 "error": (
-                    f"Aucun fournisseur disponible "
-                    f"pour la capacité '{capability}'"
+                    "Aucun fournisseur configuré "
+                    f"pour la capacité '{capability}'."
                 ),
                 "capability": capability,
+                "attempts": [],
             }
 
         errors = []
 
         for provider in candidates:
 
-            handler = self.handlers.get(provider.name)
+            handler = self.handlers.get(
+                provider.name
+            )
 
             if not handler:
                 continue
 
-            for attempt in range(provider.max_retries + 1):
+            total_attempts = (
+                provider.max_retries + 1
+            )
+
+            for attempt in range(
+                total_attempts
+            ):
 
                 started = time.time()
 
                 try:
-                    result = self._execute_with_timeout(
-                        handler,
-                        provider.timeout,
-                        *args,
-                        **kwargs,
+
+                    result = (
+                        self._execute_with_timeout(
+                            handler,
+                            provider.timeout,
+                            *args,
+                            **kwargs,
+                        )
                     )
 
-                    elapsed = time.time() - started
+                    elapsed = (
+                        time.time() - started
+                    )
+
+                    if result is None:
+                        raise RuntimeError(
+                            "Le fournisseur a retourné "
+                            "une réponse vide."
+                        )
+
+                    if (
+                        isinstance(result, str)
+                        and not result.strip()
+                    ):
+                        raise RuntimeError(
+                            "Le fournisseur a retourné "
+                            "une réponse vide."
+                        )
 
                     with self.lock:
+
                         provider.successes += 1
+
                         provider.failures = 0
-                        provider.last_success = time.time()
+
+                        provider.last_success = (
+                            time.time()
+                        )
+
                         provider.last_error = None
+
+                        provider.last_failure = 0.0
 
                     return {
                         "ok": True,
                         "provider": provider.name,
                         "attempt": attempt + 1,
-                        "latency": round(elapsed, 3),
+                        "latency": round(
+                            elapsed,
+                            3,
+                        ),
                         "result": result,
+                        "attempts": errors,
                     }
 
                 except Exception as exc:
 
-                    error = str(exc)
+                    error = (
+                        f"{type(exc).__name__}: "
+                        f"{exc}"
+                    )
 
                     with self.lock:
+
                         provider.failures += 1
+
                         provider.last_error = error
-                        provider.last_failure = time.time()
+
+                        provider.last_failure = (
+                            time.time()
+                        )
 
                     errors.append(
                         {
-                            "provider": provider.name,
-                            "attempt": attempt + 1,
+                            "provider": (
+                                provider.name
+                            ),
+                            "attempt": (
+                                attempt + 1
+                            ),
                             "error": error,
                         }
                     )
 
-                    if attempt < provider.max_retries:
+                    if attempt < total_attempts - 1:
 
                         delay = min(
                             2 ** attempt,
@@ -222,18 +414,25 @@ class ResilientProviderRouter:
 
                         time.sleep(delay)
 
-            # fournisseur suivant
+            # ------------------------------------------------
+            # IMPORTANT :
+            # Le fournisseur courant a échoué.
+            # On passe automatiquement au suivant.
+            # ------------------------------------------------
 
         return {
             "ok": False,
-            "error": "Tous les fournisseurs ont échoué",
+            "error": (
+                "Tous les fournisseurs configurés "
+                "pour cette capacité ont échoué."
+            ),
             "capability": capability,
             "attempts": errors,
         }
 
-    # ---------------------------------------------------------
+    # ========================================================
     # TIMEOUT
-    # ---------------------------------------------------------
+    # ========================================================
 
     @staticmethod
     def _execute_with_timeout(
@@ -242,22 +441,19 @@ class ResilientProviderRouter:
         *args,
         **kwargs,
     ):
-        """
-        Exécution avec timeout.
-
-        Pour les handlers simples et synchrones, on utilise
-        un thread daemon afin que le runtime principal ne soit
-        pas bloqué indéfiniment.
-        """
-
         result = []
+
         error = []
 
         def worker():
             try:
                 result.append(
-                    handler(*args, **kwargs)
+                    handler(
+                        *args,
+                        **kwargs,
+                    )
                 )
+
             except Exception as exc:
                 error.append(exc)
 
@@ -267,48 +463,92 @@ class ResilientProviderRouter:
         )
 
         thread.start()
-        thread.join(timeout)
+
+        thread.join(
+            max(
+                0.1,
+                float(timeout),
+            )
+        )
 
         if thread.is_alive():
             raise TimeoutError(
-                f"Timeout après {timeout}s"
+                f"Timeout après {timeout}s."
             )
 
         if error:
             raise error[0]
 
-        return result[0] if result else None
+        if not result:
+            return None
 
-    # ---------------------------------------------------------
+        return result[0]
+
+    # ========================================================
     # ÉTAT
-    # ---------------------------------------------------------
+    # ========================================================
 
     def status(self):
+
         with self.lock:
+
             return {
                 name: {
                     "capabilities": sorted(
                         provider.capabilities
                     ),
-                    "priority": provider.priority,
-                    "timeout": provider.timeout,
-                    "max_retries": provider.max_retries,
-                    "cooldown": provider.cooldown,
-                    "failures": provider.failures,
-                    "successes": provider.successes,
-                    "available": provider.available(),
-                    "last_error": provider.last_error,
-                    "last_failure": provider.last_failure,
-                    "last_success": provider.last_success,
+                    "priority": (
+                        provider.priority
+                    ),
+                    "timeout": (
+                        provider.timeout
+                    ),
+                    "max_retries": (
+                        provider.max_retries
+                    ),
+                    "cooldown": (
+                        provider.cooldown
+                    ),
+                    "failures": (
+                        provider.failures
+                    ),
+                    "successes": (
+                        provider.successes
+                    ),
+                    "available": (
+                        provider.available()
+                    ),
+                    "disabled": (
+                        provider.disabled
+                    ),
+                    "last_error": (
+                        provider.last_error
+                    ),
+                    "last_failure": (
+                        provider.last_failure
+                    ),
+                    "last_success": (
+                        provider.last_success
+                    ),
                 }
+
                 for name, provider
                 in self.providers.items()
             }
 
 
-# Instance globale de Gaïrus
-RESILIENT_ROUTER = ResilientProviderRouter()
+# ============================================================
+# INSTANCE GLOBALE
+# ============================================================
 
+RESILIENT_ROUTER = (
+    ResilientProviderRouter()
+)
+
+
+# ============================================================
+# API PUBLIQUE
+# ============================================================
 
 def register_provider(
     name,
@@ -316,10 +556,10 @@ def register_provider(
     capabilities=None,
     priority=100,
     timeout=45,
-    max_retries=2,
-    cooldown=30,
+    max_retries=1,
+    cooldown=20,
 ):
-    RESILIENT_ROUTER.register(
+    return RESILIENT_ROUTER.register(
         name=name,
         handler=handler,
         capabilities=capabilities,

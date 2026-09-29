@@ -116,16 +116,17 @@ def send_message(channel, text_value, thread_ts=None):
     return slack_api("chat.postMessage", payload)
 
 
-def _run_mission_async(objective, channel, thread_ts=None):
+def _run_mission_async(
+    objective,
+    channel,
+    thread_ts=None,
+    user_id=None,
+    team_id=None,
+):
     """
-    Exécute une mission Slack dans le même moteur pour :
-    - DM
-    - channels
-    - threads
-    - mentions
+    Point d'entrée unique Slack -> Gaïrus final runtime.
     """
     try:
-        # Le contexte mémoire est construit hors du listener Slack.
         try:
             slack_context = build_zyrvion_context(
                 objective,
@@ -133,93 +134,43 @@ def _run_mission_async(objective, channel, thread_ts=None):
             )
 
             if slack_context:
-                objective = (
-                    f"{objective}\n\n"
-                    f"{slack_context}"
-                )
+                objective = f"{objective}\\n\\n{slack_context}"
+
         except Exception as context_exc:
             print(
                 f"[GAIRUS][SLACK] Contexte mémoire indisponible : {context_exc}",
                 flush=True,
             )
 
-        from autonomy import create_autonomous_mission, autonomous_mission_cycle
+        bridge = _get_gairus_bridge()
 
-        mission_id = create_autonomous_mission(objective)
-
-        if not mission_id:
-            send_message(
-                channel,
-                "Je n'ai pas pu lancer cette demande.",
-                thread_ts,
+        if bridge is None:
+            raise RuntimeError(
+                "Gaïrus final runtime indisponible"
             )
-            return
 
-        result = None
+        result = bridge.handle_event({
+            "text": objective,
+            "user_id": user_id,
+            "channel_id": channel,
+            "team_id": team_id,
+        })
 
-        for attempt in range(4):
-            try:
-                result = autonomous_mission_cycle(mission_id)
+        reply = bridge.format_response(result)
 
-                if (
-                    isinstance(result, dict)
-                    and "database is locked" in str(
-                        result.get("error", "")
-                    ).lower()
-                    and attempt < 3
-                ):
-                    time.sleep(2 ** attempt)
-                    continue
-
-                break
-
-            except Exception as exc:
-                if (
-                    "database is locked" in str(exc).lower()
-                    and attempt < 3
-                ):
-                    time.sleep(2 ** attempt)
-                    continue
-                raise
-
-        if isinstance(result, dict):
-            if result.get("ok"):
-                reply = str(result.get("reply") or "").strip()
-
-                if reply:
-                    send_message(channel, reply, thread_ts)
-                else:
-                    send_message(
-                        channel,
-                        "Mission terminée.",
-                        thread_ts,
-                    )
-                return
-
-            error = str(
-                result.get("error")
-                or "Je n'ai pas pu terminer cette demande."
-            ).strip()
-
-            send_message(
-                channel,
-                f"⚠️ {error}",
-                thread_ts,
-            )
-            return
-
-        reply = str(result or "").strip()
-
-        if reply:
-            send_message(channel, reply, thread_ts)
-        else:
-            send_message(
-                channel,
-                "Mission terminée.",
-                thread_ts,
-            )
+        send_message(
+            channel,
+            reply or "Mission terminée.",
+            thread_ts,
+        )
 
     except Exception as exc:
+        print(
+            f"[GAIRUS][SLACK] Mission échouée : "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
         try:
             send_message(
                 channel,
@@ -237,12 +188,12 @@ def _gairus_mission_worker():
     longue ou bloquée ne puisse empêcher les messages Slack suivants.
     """
     while True:
-        objective, channel, thread_ts = _GAIRUS_MISSION_QUEUE.get()
+        objective, channel, thread_ts, user_id, team_id = _GAIRUS_MISSION_QUEUE.get()
 
         try:
             threading.Thread(
                 target=_run_mission_async,
-                args=(objective, channel, thread_ts),
+                args=(objective, channel, thread_ts, user_id, team_id),
                 name="gairus-mission-execution",
                 daemon=True,
             ).start()
@@ -255,7 +206,7 @@ def _gairus_mission_worker():
             _GAIRUS_MISSION_QUEUE.task_done()
 
 
-def start_mission(objective, channel, thread_ts=None):
+def start_mission(objective, channel, thread_ts=None, user_id=None, team_id=None):
     """
     Met une mission en file sans effectuer de travail bloquant dans le
     handler Slack.
@@ -266,7 +217,7 @@ def start_mission(objective, channel, thread_ts=None):
         return False
 
     _GAIRUS_MISSION_QUEUE.put(
-        (objective, channel, thread_ts)
+        (objective, channel, thread_ts, user_id, team_id)
     )
 
     return True
@@ -308,7 +259,7 @@ def slack_events():
         objective = objective.strip()
 
         if objective:
-            start_mission(objective, channel, ts)
+            start_mission(objective, channel, ts, event.get("user"), event.get("team"))
 
         return jsonify({"ok": True})
 
@@ -346,7 +297,13 @@ def slack_command():
             except Exception:
                 pass
 
-        start_mission(text_value, channel)
+        start_mission(
+            text_value,
+            channel,
+            None,
+            request.form.get("user_id"),
+            request.form.get("team_id"),
+        )
         return "", 200
 
     return jsonify({"ok": True})
@@ -432,7 +389,7 @@ def start_slack_socket_mode():
                 )
 
 
-                start_mission(text_value, channel, ts)
+                start_mission(text_value, channel, ts, event.get("user"), event.get("team"))
 
             except Exception as exc:
                 logger.exception("[GAIRUS][SLACK] Erreur message")
@@ -471,7 +428,7 @@ def start_slack_socket_mode():
                     thread_ts=ts,
                 )
 
-                start_mission(objective, channel, ts)
+                start_mission(objective, channel, ts, event.get("user"), event.get("team"))
 
             except Exception as exc:
                 logger.exception("[GAIRUS][SLACK] Erreur app_mention")
@@ -503,7 +460,13 @@ def start_slack_socket_mode():
                     text="Bien reçu.",
                 )
 
-                start_mission(text_value, channel)
+                start_mission(
+                    text_value,
+                    channel,
+                    None,
+                    command.get("user_id"),
+                    command.get("team_id"),
+                )
 
             except Exception as exc:
                 logger.exception("[GAIRUS][SLACK] Erreur commande")
