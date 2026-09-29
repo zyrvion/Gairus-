@@ -1,0 +1,43 @@
+services:
+  gairus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: gairus
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      PORT: "10000"
+      GAIRUS_NAME: "Gaïrus"
+      GAIRUS_PROJECT: "ZYRVION"
+      GAIRUS_AUTONOMY: "true"
+      GAIRUS_APPROVALS: "true"
+      GAIRUS_LLM_PROVIDER: "auto"
+      GAIRUS_LLM_MODEL: "auto"
+
+    ports:
+      - "10000:10000"
+
+    volumes:
+      - gairus_data:/app/data
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:10000/health', timeout=5)"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  gairus_data:

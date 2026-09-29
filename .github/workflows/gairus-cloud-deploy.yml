@@ -1,0 +1,103 @@
+name: Gaïrus Cloud Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: gairus-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test Gaïrus
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile
+        run: |
+          python -m py_compile \
+            app.py \
+            slack_gateway.py \
+            slack_worker.py \
+            providers.py \
+            resilience.py \
+            cloud_control_plane.py \
+            core/final_operations_runtime.py
+
+      - name: Git diff check
+        run: git diff --check
+
+  deploy:
+    name: Deploy Gaïrus
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        env:
+          GAIRUS_ORACLE_SSH_KEY: ${{ secrets.GAIRUS_ORACLE_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$GAIRUS_ORACLE_SSH_KEY" > ~/.ssh/gairus_oracle
+          chmod 600 ~/.ssh/gairus_oracle
+
+      - name: Deploy
+        env:
+          GAIRUS_ORACLE_HOST: ${{ secrets.GAIRUS_ORACLE_HOST }}
+          GAIRUS_ORACLE_USER: ${{ secrets.GAIRUS_ORACLE_USER }}
+        run: |
+          ssh \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -i ~/.ssh/gairus_oracle \
+            "${GAIRUS_ORACLE_USER}@${GAIRUS_ORACLE_HOST}" \
+            'set -eu
+             mkdir -p /opt/gairus
+             if [ ! -d /opt/gairus/.git ]; then
+               git clone --branch main https://github.com/zyrvion/Gairus-.git /opt/gairus
+             fi
+             cd /opt/gairus
+             git fetch origin main
+             git reset --hard origin/main
+             docker compose up -d --build
+             docker compose ps'
+
+      - name: Health check
+        env:
+          GAIRUS_ORACLE_HOST: ${{ secrets.GAIRUS_ORACLE_HOST }}
+          GAIRUS_ORACLE_USER: ${{ secrets.GAIRUS_ORACLE_USER }}
+        run: |
+          for i in $(seq 1 12); do
+            if ssh \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=accept-new \
+              -i ~/.ssh/gairus_oracle \
+              "${GAIRUS_ORACLE_USER}@${GAIRUS_ORACLE_HOST}" \
+              'curl -fsS --max-time 10 http://127.0.0.1:10000/health'
+            then
+              echo "GAÏRUS HEALTH: OK"
+              exit 0
+            fi
+            echo "Healthcheck $i/12..."
+            sleep 10
+          done
+
+          echo "GAÏRUS HEALTH: FAILED"
+          exit 1
