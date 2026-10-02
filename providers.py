@@ -46,9 +46,48 @@ AI_PROVIDERS = {
         "base": "https://api.z.ai/api/paas/v4",
         "model": os.getenv("ZAI_MODEL", "GLM-4.7-Flash"),
     },
+    "cloudflare": {
+        "env": "CLOUDFLARE_API_TOKEN",
+        "model": os.getenv(
+            "CLOUDFLARE_MODEL",
+            "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+        ),
+    },
 }
 
 FREE_PRICING = {"free_tier", "free_models"}
+PROVIDER_ENV_ALIASES = {
+    "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+}
+
+
+def provider_api_key(provider):
+    cfg = next(
+        (item for item in PROVIDER_CATALOG if item.get("id") == provider),
+        None,
+    )
+    if not cfg:
+        return ""
+    env_names = PROVIDER_ENV_ALIASES.get(
+        provider,
+        (cfg.get("env"),),
+    )
+    return next(
+        (
+            os.getenv(env_name, "").strip()
+            for env_name in env_names
+            if env_name and os.getenv(env_name, "").strip()
+        ),
+        "",
+    )
+
+
+def provider_configured(provider):
+    if not provider_api_key(provider):
+        return False
+    if provider == "cloudflare":
+        return bool(os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip())
+    return True
 
 
 def free_provider_names():
@@ -87,11 +126,37 @@ def call_openai_provider(name, prompt, system=None):
     if not cfg:
         raise RuntimeError(f"{name}: fournisseur introuvable")
 
-    key_name = cfg.get("env")
-    key = os.getenv(key_name, "").strip() if key_name else ""
+    key = provider_api_key(name)
 
     if not key:
         raise RuntimeError(f"{name}: clé absente")
+
+    if name == "cloudflare":
+        account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+        if not account_id:
+            raise RuntimeError("cloudflare: identifiant de compte absent")
+        model = provider_model(name)
+        if not model:
+            raise RuntimeError("cloudflare: modèle inconnu")
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        response = requests.post(
+            f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}",
+            headers={
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+            },
+            json={"messages": messages},
+            timeout=TIMEOUT,
+        )
+        response.raise_for_status()
+        data = response.json()
+        text = data.get("result", {}).get("response")
+        if not isinstance(text, str) or not text.strip():
+            raise RuntimeError("cloudflare: réponse texte absente")
+        return text
 
     base = cfg.get("base_url") or cfg.get("base") or ""
 
@@ -173,9 +238,7 @@ def ask_with_fallback(prompt, system=None):
             cfg = AI_PROVIDERS.get(provider)
             if not cfg:
                 continue
-            key_name = cfg.get("env")
-
-            if not os.getenv(key_name):
+            if not provider_configured(provider):
                 continue
 
             reply = ask_provider(
@@ -342,7 +405,7 @@ def discover_provider_catalog():
         if not env_name:
             continue
 
-        configured = bool(os.getenv(env_name, "").strip())
+        configured = provider_configured(provider["id"])
 
         if provider.get("type") == "local":
             configured = bool(os.getenv(env_name, "").strip())
@@ -376,9 +439,9 @@ def provider_network_status():
 
     for provider in PROVIDER_CATALOG:
         env_name = provider.get("env")
-        configured = bool(
-            os.getenv(env_name, "").strip()
-        ) if env_name else False
+        configured = provider_configured(provider["id"])
+        if provider.get("type") == "local" and env_name:
+            configured = bool(os.getenv(env_name, "").strip())
 
         result.append({
             "id": provider["id"],
@@ -408,11 +471,10 @@ except Exception:
 
 
 def _catalog_provider_configured(provider):
-    import os
     env_name = provider.get("env")
     if not env_name:
         return False
-    return bool(os.getenv(env_name, "").strip())
+    return provider_configured(provider["id"])
 
 
 def configured_provider_catalog():
