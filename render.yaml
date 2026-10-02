@@ -18,3 +18,5 @@ services:
         value: auto
       - key: GAIRUS_LLM_MODEL
         value: auto
+      - key: GAIRUS_ORTA_API_KEY
+        sync: false

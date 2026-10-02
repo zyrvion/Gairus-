@@ -9,7 +9,7 @@ TIMEOUT = int(os.getenv("GAIRUS_PROVIDER_TIMEOUT", "90"))
 
 AI_PROVIDERS = {
     "gemini": {
-        "env": "GOOGLE_API_KEY",
+        "env": "GEMINI_API_KEY",
         "base": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "model": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
     },

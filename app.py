@@ -1,6 +1,9 @@
 from slack_gateway import slack_bp
+import hmac
 import os
 import json
+import math
+import re
 import sqlite3
 import threading
 import time
@@ -391,6 +394,110 @@ def chat():
         "brain": brain,
         "agent": NAME,
     })
+
+
+@app.route("/api/orta/chat", methods=["POST"])
+def orta_chat():
+    expected_key = os.getenv("GAIRUS_ORTA_API_KEY", "").strip()
+    if not expected_key:
+        return jsonify({"error": "ORTA endpoint is not configured"}), 503
+
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, provided_key = authorization.partition(" ")
+    if (
+        scheme.lower() != "bearer"
+        or not provided_key
+        or not hmac.compare_digest(provided_key.strip(), expected_key)
+    ):
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid JSON body"}), 400
+
+    system_prompt = data.get("system_prompt")
+    input_text = data.get("input_text")
+    if not isinstance(system_prompt, str) or not isinstance(input_text, str):
+        return jsonify({"error": "system_prompt and input_text are required"}), 400
+    if not system_prompt.strip() or not input_text.strip():
+        return jsonify({"error": "system_prompt and input_text must not be empty"}), 400
+    if len(system_prompt) > 60_000 or len(input_text) > 12_000:
+        return jsonify({"error": "prompt is too long"}), 413
+
+    output_instruction = """
+Return ONLY one valid JSON object with these fields:
+reply (non-empty string), intent (chat|order|navigate|admin),
+itemQuery, vendorQuery, addressText, route, adminAction, targetQuery,
+productName, reason (strings), quantity (positive integer), amount (number).
+Do not wrap the JSON in markdown fences. Put the user-facing answer in reply.
+"""
+
+    try:
+        result = ask_with_fallback(
+            prompt=input_text,
+            system=f"{system_prompt}\n\n{output_instruction}",
+        )
+        if not result.get("provider"):
+            return jsonify({"error": "no AI provider available"}), 503
+
+        generated = result.get("reply")
+        if not isinstance(generated, str) or not generated.strip():
+            return jsonify({"error": "AI provider returned an empty response"}), 502
+
+        candidate = generated.strip()
+        if candidate.startswith("```"):
+            candidate = re.sub(r"^```(?:json)?\s*|\s*```$", "", candidate, flags=re.IGNORECASE)
+        start = candidate.find("{")
+        if start < 0:
+            return jsonify({"error": "AI provider returned invalid structured output"}), 502
+        parsed, _ = json.JSONDecoder().raw_decode(candidate[start:])
+        if not isinstance(parsed, dict):
+            return jsonify({"error": "AI provider returned invalid structured output"}), 502
+
+        reply = parsed.get("reply")
+        if not isinstance(reply, str) or not reply.strip():
+            return jsonify({"error": "AI provider returned no reply"}), 502
+
+        string_fields = (
+            "itemQuery",
+            "vendorQuery",
+            "addressText",
+            "route",
+            "adminAction",
+            "targetQuery",
+            "productName",
+            "reason",
+        )
+        response = {
+            "reply": reply.strip()[:8_000],
+            "intent": parsed.get("intent")
+            if parsed.get("intent") in {"chat", "order", "navigate", "admin"}
+            else "chat",
+        }
+        response.update({
+            field: parsed.get(field, "")[:2_000]
+            if isinstance(parsed.get(field, ""), str)
+            else ""
+            for field in string_fields
+        })
+
+        quantity = parsed.get("quantity", 1)
+        response["quantity"] = (
+            max(1, min(int(quantity), 100))
+            if isinstance(quantity, (int, float)) and math.isfinite(quantity)
+            else 1
+        )
+        amount = parsed.get("amount", 0)
+        response["amount"] = (
+            amount if isinstance(amount, (int, float)) and math.isfinite(amount) else 0
+        )
+        return jsonify(response)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        app.logger.warning("ORTA fallback returned malformed structured output")
+        return jsonify({"error": "AI provider returned invalid structured output"}), 502
+    except Exception:
+        app.logger.exception("ORTA fallback provider call failed")
+        return jsonify({"error": "AI provider request failed"}), 502
 
 
 @app.route("/api/memory", methods=["GET", "POST"])
