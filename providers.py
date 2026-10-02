@@ -41,7 +41,37 @@ AI_PROVIDERS = {
             "meta/llama-3.3-70b-instruct"
         ),
     },
+    "zai": {
+        "env": "ZAI_API_KEY",
+        "base": "https://api.z.ai/api/paas/v4",
+        "model": os.getenv("ZAI_MODEL", "GLM-4.7-Flash"),
+    },
 }
+
+FREE_PRICING = {"free_tier", "free_models"}
+
+
+def free_provider_names():
+    return [
+        provider["id"]
+        for provider in sorted(
+            PROVIDER_CATALOG,
+            key=lambda item: item.get("priority", 100),
+        )
+        if provider.get("pricing") in FREE_PRICING
+        and provider.get("id") in AI_PROVIDERS
+    ]
+
+
+def provider_model(provider):
+    cfg = next(
+        (item for item in PROVIDER_CATALOG if item.get("id") == provider),
+        None,
+    )
+    if not cfg:
+        return None
+    model_env = cfg.get("model_env", f"{provider.upper()}_MODEL")
+    return os.getenv(model_env) or cfg.get("default_model") or cfg.get("model")
 
 
 def call_openai_provider(name, prompt, system=None):
@@ -73,17 +103,14 @@ def call_openai_provider(name, prompt, system=None):
             "openrouter": "https://openrouter.ai/api/v1",
             "cerebras": "https://api.cerebras.ai/v1",
             "nvidia": "https://integrate.api.nvidia.com/v1",
+            "zai": "https://api.z.ai/api/paas/v4",
         }
         base = base_urls.get(name, "")
 
     if not base:
         raise RuntimeError(f"{name}: URL API inconnue")
 
-    model = (
-        cfg.get("default_model")
-        or cfg.get("model")
-        or os.getenv(f"{name.upper()}_MODEL")
-    )
+    model = provider_model(name)
 
     if not model:
         raise RuntimeError(f"{name}: modèle inconnu")
@@ -136,19 +163,8 @@ def ask_provider(name, prompt, system=None):
 
 
 def ask_with_fallback(prompt, system=None):
-    """
-    Fallback gratuit/prioritaire de Gaïrus.
-
-    Ordre :
-    Gemini -> Groq -> OpenRouter -> Mistral
-    """
-
-    order = [
-        "gemini",
-        "groq",
-        "openrouter",
-        "mistral",
-    ]
+    """Try configured providers catalogued as free-tier/free-models only."""
+    order = free_provider_names()
 
     errors = []
 
@@ -171,7 +187,7 @@ def ask_with_fallback(prompt, system=None):
             if reply:
                 return {
                     "provider": provider,
-                    "model": cfg.get("default_model") or cfg.get("model"),
+                    "model": provider_model(provider),
                     "reply": reply,
                     "errors": errors,
                 }
@@ -209,22 +225,10 @@ try:
         )
 
     # Fournisseurs réellement définis dans PROVIDERS.
-    _RESILIENT_PROVIDER_NAMES = [
-        "gemini",
-        "groq",
-        "openrouter",
-        "mistral",
-        "cerebras",
-        "nvidia",
-    ]
-
+    _RESILIENT_PROVIDER_NAMES = free_provider_names()
     _RESILIENT_PRIORITIES = {
-        "gemini": 10,
-        "groq": 20,
-        "openrouter": 30,
-        "mistral": 40,
-        "cerebras": 50,
-        "nvidia": 60,
+        item["id"]: item.get("priority", 100)
+        for item in PROVIDER_CATALOG
     }
 
     for _provider_name in _RESILIENT_PROVIDER_NAMES:
@@ -300,14 +304,7 @@ def ask_resilient(prompt, system=None, preferred=None):
 
             return {
                 "provider": provider_name,
-                "model": next(
-                    (
-                        item.get("default_model")
-                        for item in PROVIDER_CATALOG
-                        if item.get("id") == provider_name
-                    ),
-                    None,
-                ),
+                "model": provider_model(provider_name),
                 "reply": result.get("result"),
                 "errors": [],
             }
