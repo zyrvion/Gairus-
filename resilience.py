@@ -203,6 +203,7 @@ class ResilientProviderRouter:
     @staticmethod
     def _provider_configured(name: str) -> bool:
         try:
+            import os
             from provider_catalog import PROVIDERS
 
             cfg = next(
@@ -222,9 +223,16 @@ class ResilientProviderRouter:
             if not env_name:
                 return False
 
-            return bool(
-                __import__("os").getenv(env_name, "").strip()
-            )
+            configured = bool(os.getenv(env_name, "").strip())
+            if name == "gemini":
+                configured = configured or bool(
+                    os.getenv("GOOGLE_API_KEY", "").strip()
+                )
+            if name == "cloudflare":
+                configured = configured and bool(
+                    os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+                )
+            return configured
 
         except Exception:
             return False

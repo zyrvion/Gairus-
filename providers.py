@@ -9,7 +9,7 @@ TIMEOUT = int(os.getenv("GAIRUS_PROVIDER_TIMEOUT", "90"))
 
 AI_PROVIDERS = {
     "gemini": {
-        "env": "GOOGLE_API_KEY",
+        "env": "GEMINI_API_KEY",
         "base": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "model": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
     },
@@ -41,7 +41,76 @@ AI_PROVIDERS = {
             "meta/llama-3.3-70b-instruct"
         ),
     },
+    "zai": {
+        "env": "ZAI_API_KEY",
+        "base": "https://api.z.ai/api/paas/v4",
+        "model": os.getenv("ZAI_MODEL", "GLM-4.7-Flash"),
+    },
+    "cloudflare": {
+        "env": "CLOUDFLARE_API_TOKEN",
+        "model": os.getenv(
+            "CLOUDFLARE_MODEL",
+            "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+        ),
+    },
 }
+
+FREE_PRICING = {"free_tier", "free_models"}
+PROVIDER_ENV_ALIASES = {
+    "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+}
+
+
+def provider_api_key(provider):
+    cfg = next(
+        (item for item in PROVIDER_CATALOG if item.get("id") == provider),
+        None,
+    )
+    if not cfg:
+        return ""
+    env_names = PROVIDER_ENV_ALIASES.get(
+        provider,
+        (cfg.get("env"),),
+    )
+    return next(
+        (
+            os.getenv(env_name, "").strip()
+            for env_name in env_names
+            if env_name and os.getenv(env_name, "").strip()
+        ),
+        "",
+    )
+
+
+def provider_configured(provider):
+    if not provider_api_key(provider):
+        return False
+    if provider == "cloudflare":
+        return bool(os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip())
+    return True
+
+
+def free_provider_names():
+    return [
+        provider["id"]
+        for provider in sorted(
+            PROVIDER_CATALOG,
+            key=lambda item: item.get("priority", 100),
+        )
+        if provider.get("pricing") in FREE_PRICING
+        and provider.get("id") in AI_PROVIDERS
+    ]
+
+
+def provider_model(provider):
+    cfg = next(
+        (item for item in PROVIDER_CATALOG if item.get("id") == provider),
+        None,
+    )
+    if not cfg:
+        return None
+    model_env = cfg.get("model_env", f"{provider.upper()}_MODEL")
+    return os.getenv(model_env) or cfg.get("default_model") or cfg.get("model")
 
 
 def call_openai_provider(name, prompt, system=None):
@@ -57,11 +126,37 @@ def call_openai_provider(name, prompt, system=None):
     if not cfg:
         raise RuntimeError(f"{name}: fournisseur introuvable")
 
-    key_name = cfg.get("env")
-    key = os.getenv(key_name, "").strip() if key_name else ""
+    key = provider_api_key(name)
 
     if not key:
         raise RuntimeError(f"{name}: clé absente")
+
+    if name == "cloudflare":
+        account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+        if not account_id:
+            raise RuntimeError("cloudflare: identifiant de compte absent")
+        model = provider_model(name)
+        if not model:
+            raise RuntimeError("cloudflare: modèle inconnu")
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        response = requests.post(
+            f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}",
+            headers={
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+            },
+            json={"messages": messages},
+            timeout=TIMEOUT,
+        )
+        response.raise_for_status()
+        data = response.json()
+        text = data.get("result", {}).get("response")
+        if not isinstance(text, str) or not text.strip():
+            raise RuntimeError("cloudflare: réponse texte absente")
+        return text
 
     base = cfg.get("base_url") or cfg.get("base") or ""
 
@@ -73,17 +168,14 @@ def call_openai_provider(name, prompt, system=None):
             "openrouter": "https://openrouter.ai/api/v1",
             "cerebras": "https://api.cerebras.ai/v1",
             "nvidia": "https://integrate.api.nvidia.com/v1",
+            "zai": "https://api.z.ai/api/paas/v4",
         }
         base = base_urls.get(name, "")
 
     if not base:
         raise RuntimeError(f"{name}: URL API inconnue")
 
-    model = (
-        cfg.get("default_model")
-        or cfg.get("model")
-        or os.getenv(f"{name.upper()}_MODEL")
-    )
+    model = provider_model(name)
 
     if not model:
         raise RuntimeError(f"{name}: modèle inconnu")
@@ -136,19 +228,8 @@ def ask_provider(name, prompt, system=None):
 
 
 def ask_with_fallback(prompt, system=None):
-    """
-    Fallback gratuit/prioritaire de Gaïrus.
-
-    Ordre :
-    Gemini -> Groq -> OpenRouter -> Mistral
-    """
-
-    order = [
-        "gemini",
-        "groq",
-        "openrouter",
-        "mistral",
-    ]
+    """Try configured providers catalogued as free-tier/free-models only."""
+    order = free_provider_names()
 
     errors = []
 
@@ -157,9 +238,7 @@ def ask_with_fallback(prompt, system=None):
             cfg = AI_PROVIDERS.get(provider)
             if not cfg:
                 continue
-            key_name = cfg.get("env")
-
-            if not os.getenv(key_name):
+            if not provider_configured(provider):
                 continue
 
             reply = ask_provider(
@@ -171,7 +250,7 @@ def ask_with_fallback(prompt, system=None):
             if reply:
                 return {
                     "provider": provider,
-                    "model": cfg.get("default_model") or cfg.get("model"),
+                    "model": provider_model(provider),
                     "reply": reply,
                     "errors": errors,
                 }
@@ -209,22 +288,10 @@ try:
         )
 
     # Fournisseurs réellement définis dans PROVIDERS.
-    _RESILIENT_PROVIDER_NAMES = [
-        "gemini",
-        "groq",
-        "openrouter",
-        "mistral",
-        "cerebras",
-        "nvidia",
-    ]
-
+    _RESILIENT_PROVIDER_NAMES = free_provider_names()
     _RESILIENT_PRIORITIES = {
-        "gemini": 10,
-        "groq": 20,
-        "openrouter": 30,
-        "mistral": 40,
-        "cerebras": 50,
-        "nvidia": 60,
+        item["id"]: item.get("priority", 100)
+        for item in PROVIDER_CATALOG
     }
 
     for _provider_name in _RESILIENT_PROVIDER_NAMES:
@@ -300,14 +367,7 @@ def ask_resilient(prompt, system=None, preferred=None):
 
             return {
                 "provider": provider_name,
-                "model": next(
-                    (
-                        item.get("default_model")
-                        for item in PROVIDER_CATALOG
-                        if item.get("id") == provider_name
-                    ),
-                    None,
-                ),
+                "model": provider_model(provider_name),
                 "reply": result.get("result"),
                 "errors": [],
             }
@@ -345,7 +405,7 @@ def discover_provider_catalog():
         if not env_name:
             continue
 
-        configured = bool(os.getenv(env_name, "").strip())
+        configured = provider_configured(provider["id"])
 
         if provider.get("type") == "local":
             configured = bool(os.getenv(env_name, "").strip())
@@ -379,9 +439,9 @@ def provider_network_status():
 
     for provider in PROVIDER_CATALOG:
         env_name = provider.get("env")
-        configured = bool(
-            os.getenv(env_name, "").strip()
-        ) if env_name else False
+        configured = provider_configured(provider["id"])
+        if provider.get("type") == "local" and env_name:
+            configured = bool(os.getenv(env_name, "").strip())
 
         result.append({
             "id": provider["id"],
@@ -411,11 +471,10 @@ except Exception:
 
 
 def _catalog_provider_configured(provider):
-    import os
     env_name = provider.get("env")
     if not env_name:
         return False
-    return bool(os.getenv(env_name, "").strip())
+    return provider_configured(provider["id"])
 
 
 def configured_provider_catalog():
