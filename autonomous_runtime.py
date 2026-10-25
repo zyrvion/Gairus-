@@ -754,4 +754,5 @@ class AutonomousRuntime:
             "version": "1.0",
             "root": str(ROOT),
             "autonomy": self.governance.autonomy,
-            "approvals": self.governance.approva
+            "approvals": self.governance.approvals,
+        }

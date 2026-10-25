@@ -67,6 +67,22 @@ button{cursor:pointer}
 .missionForm{border:1px solid #e5e7ea;border-radius:14px;padding:18px;margin-bottom:20px}
 .missionForm input,.missionForm textarea{width:100%;border:1px solid #dfe3e8;border-radius:10px;padding:11px;margin:6px 0 12px;outline:0}
 .missionForm textarea{min-height:90px;resize:vertical}
+.authPage{min-height:100dvh;display:grid;place-items:center;background:#f6f7f9;padding:28px}
+.authCard{max-width:460px;width:100%;border:1px solid #dfe3e8;background:white;border-radius:20px;padding:36px}
+.authCard h1{font-size:30px;letter-spacing:-1px;margin:12px 0}
+.authCard p{font-size:14px;line-height:1.7;color:#525d6b}
+.authEyebrow{font-size:11px!important;letter-spacing:2px;margin-top:28px}
+.authCard label{display:block;font-size:13px;font-weight:650;margin:24px 0 10px}
+.authCard input{width:100%;border:1px solid #abb4bf;border-radius:9px;padding:12px}
+.authCard button{width:100%;margin-top:12px;padding:12px}
+.authCard .authError{color:#a22219}
+.authCard .authNote{font-size:12px;color:#59636e;margin-bottom:0}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #245db8;outline-offset:3px}
+.app{height:100dvh}
+.chat{height:100%;min-height:0}
+.page:has(.chat){display:flex;min-height:0;padding-top:0;padding-bottom:0}
+.messages{min-height:0}
+@media(max-width:480px){.authPage{padding:16px}.authCard{padding:26px}.sectionHead{align-items:start;gap:10px;flex-direction:column}}
 @media(max-width:760px){
  .side{position:fixed;left:-270px;top:0;bottom:0;z-index:50;transition:left .2s}
  .side.open{left:0}

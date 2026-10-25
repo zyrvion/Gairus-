@@ -6,3 +6,11 @@ models/
 resource-manager/
 data/content/
 data/company/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.jsonl
+*.log
+.pytest_cache/
+.venv*/

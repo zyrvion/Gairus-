@@ -13,7 +13,13 @@ from pathlib import Path
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
-MEMORY_DB = str(BASE_DIR / "slack_memory.db")
+_legacy_memory = BASE_DIR / "slack_memory.db"
+MEMORY_DB = os.getenv(
+    "GAIRUS_SLACK_MEMORY_DB",
+    str(_legacy_memory if _legacy_memory.exists() else
+        Path(os.getenv("GAIRUS_DATA_DIR", str(BASE_DIR / "data"))) / "slack_memory.db"),
+)
+Path(MEMORY_DB).parent.mkdir(parents=True, exist_ok=True)
 
 SLACK_TOKEN = (
     os.getenv("SLACK_BOT_TOKEN")

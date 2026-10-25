@@ -55,27 +55,31 @@ def test_unapproved_sensitive_action_is_blocked():
 def test_approved_sensitive_action_can_pass():
     c = CompanyController()
     actor = get_gairus(c)
+    # A test fixture is not a production human account or an automatic approval.
+    human = c.enterprise.add_employee(
+        name="Test human approver", role="Owner", department="direction",
+        level="human_admin",
+    )
 
     approval = c.enterprise.request_approval(
         actor_id=actor.id,
         action="legal_signature",
     )
 
-    assert approval["status"] == "pending"
+    assert approval["status"] == "approval_required"
+    assert approval["approval"]["status"] == "pending"
 
-    approver = next(
-        e for e in c.enterprise.employees.values()
-        if e.level >= 5 and e.id != actor.id
-    )
+    approver = c.enterprise.employees[human["id"]]
 
     resolved = c.enterprise.resolve_approval(
-        approval_id=approval["approval_id"],
+        approval_id=approval["approval"]["id"],
         approver_id=approver.id,
         decision="approved",
         note="Approbation humaine de test",
     )
 
-    assert resolved["status"] == "approved"
+    assert resolved["status"] == "resolved"
+    assert resolved["approval"]["status"] == "approved"
 
     result = c.require_governance(
         actor.id,
@@ -83,6 +87,28 @@ def test_approved_sensitive_action_can_pass():
     )
 
     assert result["status"] == "allowed"
+
+
+def test_sensitive_approval_requires_a_real_human():
+    c = CompanyController()
+    actor = get_gairus(c)
+    approval = c.enterprise.request_approval(actor.id, "legal_signature")
+    assert approval["status"] == "error"
+    assert approval["required_level"] == 5
+
+
+def test_inactive_human_cannot_approve():
+    c = CompanyController()
+    actor = get_gairus(c)
+    human = c.enterprise.add_employee(
+        name="Test human", role="Owner", department="direction", level="human_admin",
+    )
+    approval = c.enterprise.request_approval(actor.id, "legal_signature")
+    c.enterprise.employees[human["id"]].active = False
+    resolved = c.enterprise.resolve_approval(
+        approval["approval"]["id"], human["id"], "approved",
+    )
+    assert resolved["status"] == "error"
 
 
 if __name__ == "__main__":

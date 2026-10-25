@@ -26,6 +26,7 @@ from autonomy import (
 )
 from flask import Flask, jsonify, request, render_template, send_from_directory
 from flask_cors import CORS
+from security.web_auth import install_web_auth
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -36,10 +37,16 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB = DATA_DIR / "gairus.db"
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-CORS(app)
+allowed_origins = [
+    origin.strip() for origin in os.getenv("GAIRUS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if allowed_origins:
+    CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
+install_web_auth(app)
 
 NAME = os.getenv("GAIRUS_NAME", "Gaïrus")
-AUTONOMY = os.getenv("GAIRUS_AUTONOMY", "true").lower() == "true"
+AUTONOMY = os.getenv("GAIRUS_AUTONOMY", "false").lower() == "true"
 APPROVALS = os.getenv("GAIRUS_APPROVALS", "true").lower() == "true"
 
 
@@ -336,6 +343,7 @@ def icon_512():
     return send_from_directory("static", "icon-512.png")
 
 @app.route("/health")
+@app.route("/healthz")
 def health():
     return jsonify({
         "status": "ok",
@@ -347,12 +355,16 @@ def health():
 
 @app.route("/api/status")
 def status():
+    from providers import discover_provider_catalog
+    configured = discover_provider_catalog()
     return jsonify({
         "agent": NAME,
         "version": "3.0",
         "status": "online",
         "autonomy": AUTONOMY,
         "approvals": APPROVALS,
+        "providers_configured": len(configured),
+        "provider": ", ".join(p["name"] for p in configured) or None,
         "brains": [
             "orchestrator",
             "reasoning",
@@ -394,6 +406,18 @@ def chat():
         "brain": brain,
         "agent": NAME,
     })
+
+
+@app.get("/api/conversations")
+def conversation_history():
+    con = db()
+    try:
+        rows = con.execute(
+            "SELECT role, content, created_at FROM conversations ORDER BY id DESC LIMIT 100"
+        ).fetchall()
+        return jsonify([dict(row) for row in reversed(rows)])
+    finally:
+        con.close()
 
 
 @app.route("/api/orta/chat", methods=["POST"])
@@ -800,13 +824,6 @@ def autonomy_cycle():
         "results": run_cycle()
     })
 
-if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", "5000")),
-        debug=False,
-    )
-
 # ============================================================
 # GAÏRUS AUTONOMY RUNTIME API
 # ============================================================
@@ -966,3 +983,7 @@ except Exception as e:
         }
 
 # === END GAIRUS_NETWORK_RUNTIME_API ===
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=False)

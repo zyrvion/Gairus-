@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .governance_gate import GovernanceGate, GovernanceBlocked
+from .audit_gateway import AuditGateway
 
 
 class ActionGateway:
@@ -14,6 +15,7 @@ class ActionGateway:
     def __init__(self, enterprise=None, controller=None):
         self.enterprise = enterprise
         self.controller = controller
+        self.audit_gateway = AuditGateway(enterprise=enterprise)
         self.governance = GovernanceGate(
             enterprise=enterprise,
             controller=controller,
@@ -26,13 +28,23 @@ class ActionGateway:
         tool=None,
         amount=None,
     ):
-        return self.governance.check(
-            actor_id=actor_id,
-            action=action or tool or "",
-            tool=tool,
-            amount=amount,
-            require_approval=True,
+        action = action or tool or ""
+        try:
+            result = self.governance.check(
+                actor_id=actor_id, action=action, tool=tool,
+                amount=amount, require_approval=True,
+            )
+        except GovernanceBlocked as exc:
+            self.audit_gateway.record(
+                actor_id=actor_id, action=action, tool=tool,
+                amount=amount, status="blocked", error=str(exc),
+            )
+            raise
+        self.audit_gateway.record(
+            actor_id=actor_id, action=action, tool=tool,
+            amount=amount, status="allowed", authorization=result,
         )
+        return result
 
     def authorize_tool(
         self,
@@ -41,7 +53,7 @@ class ActionGateway:
         action=None,
         amount=None,
     ):
-        return self.governance.authorize_tool(
+        return self.authorize(
             actor_id=actor_id,
             tool=tool,
             action=action,

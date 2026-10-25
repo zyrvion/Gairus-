@@ -243,7 +243,7 @@ class EnterpriseEngine:
         self,
         actor_id,
         action,
-        reason,
+        reason="Approbation humaine requise",
         mission_id=None,
         amount=None,
         target_level=None,
@@ -287,6 +287,7 @@ class EnterpriseEngine:
             employee
             for employee in self.employees.values()
             if employee.level >= required_level
+            and employee.active
             and employee.id != actor.id
         ]
 
@@ -350,6 +351,9 @@ class EnterpriseEngine:
                 "message": "Approbateur inconnu",
                 "approver_id": approver_id,
             }
+
+        if not approver.active:
+            return {"status": "error", "message": "Approbateur inactif"}
 
         if approver.id != approval["approver_id"] and approver.level < approval["approver_level"]:
             return {

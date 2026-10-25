@@ -767,4 +767,8 @@ class ScheduledAutomationEngine:
         }
 
     def status(self):
-        with se
+        with self.lock:
+            return {
+                name: {key: value for key, value in job.items() if key != "callback"}
+                for name, job in self.jobs.items()
+            }

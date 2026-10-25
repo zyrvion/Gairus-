@@ -11,7 +11,7 @@ services:
       - key: GAIRUS_NAME
         value: Gaïrus
       - key: GAIRUS_AUTONOMY
-        value: "true"
+        value: "false"
       - key: GAIRUS_APPROVALS
         value: "true"
       - key: GAIRUS_LLM_PROVIDER
@@ -20,6 +20,10 @@ services:
         value: auto
       - key: GAIRUS_ORTA_API_KEY
         sync: false
+      - key: GAIRUS_ADMIN_KEY
+        sync: false
+      - key: GAIRUS_ALLOWED_ORIGINS
+        value: "https://gairus.zyrvion.io"
       - key: GEMINI_API_KEY
         sync: false
       - key: GOOGLE_API_KEY

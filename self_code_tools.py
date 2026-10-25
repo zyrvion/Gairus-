@@ -7,11 +7,21 @@ WORKSPACE = Path(__file__).resolve().parent
 
 
 def _safe_path(path: str) -> Path:
-    target = (WORKSPACE / str(path).lstrip("/")).resolve()
+    candidate = Path(str(path))
+    if candidate.is_absolute():
+        raise ValueError("Chemin absolu interdit.")
+    target = (WORKSPACE / candidate).resolve()
 
     if WORKSPACE not in target.parents and target != WORKSPACE:
         raise ValueError("Chemin hors du workspace interdit.")
 
+    relative = target.relative_to(WORKSPACE)
+    if (
+        any(part in {".git", "data", "secrets", ".ssh"} for part in relative.parts)
+        or target.name.startswith(".env") and target.name != ".env.example"
+        or target.suffix.lower() in {".pem", ".key", ".db", ".sqlite", ".sqlite3", ".log", ".jsonl"}
+    ):
+        raise ValueError("Accès aux secrets et données privées interdit.")
     return target
 
 

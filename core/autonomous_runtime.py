@@ -1,53 +1,3 @@
-cd ~/gairus
-
-echo "===== ORCHESTRATOR ====="
-sed -n '1,260p' core/orchestrator.py
-
-echo
-echo "===== MISSION ENGINE ====="
-sed -n '1,260p' core/mission_engine.py
-
-echo
-echo "===== MISSION ORCHESTRATOR ====="
-sed -n '1,260p' core/mission_orchestrator.py
-
-echo
-echo "===== PLANNER ====="
-sed -n '1,260p' core/planner.py
-echo "===== EXECUTOR ====="
-sed -n '1,260p' core/executor.py
-
-echo
-echo "===== VERIFIER ====="
-sed -n '1,260p' core/verifier.py
-
-echo
-echo "===== AGENT RUNTIME ====="
-sed -n '1,260p' core/agent_runtime.py
-
-echo
-echo "===== TOOL RUNTIME ====="
-sed -n '1,260p' core/tool_runtime.py
-echo "===== FINAL WIRING ====="
-sed -n '1,320p' core/final_wiring.py
-
-echo
-echo "===== FULL BOOTSTRAP ====="
-sed -n '1,320p' core/full_bootstrap.py
-
-echo
-echo "===== GAIRUS OPERATIONS ====="
-sed -n '1,320p' core/gairus_operations.py
-
-cd ~/gairus || exit 1
-
-mkdir -p core data logs
-
-if [ -f core/autonomous_runtime.py ]; then
-    cp core/autonomous_runtime.py "core/autonomous_runtime.py.before_autonomous_$(date +%Y%m%d_%H%M%S)"
-fi
-
-cat > core/autonomous_runtime.py <<'PY'
 from __future__ import annotations
 
 import asyncio
@@ -787,4 +737,13 @@ class AutonomousRuntime:
             "returncode": process.returncode,
         }
 
-    def too
+    def _unsupported_legacy_tool(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Legacy runtime incomplete; use autonomous_runtime_v3.AutonomousRuntime."
+        )
+
+    tool_shell = _unsupported_legacy_tool
+    tool_git_status = _unsupported_legacy_tool
+    tool_git_log = _unsupported_legacy_tool
+    tool_http_get = _unsupported_legacy_tool
+    tool_inspect_modules = _unsupported_legacy_tool
