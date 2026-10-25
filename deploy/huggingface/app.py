@@ -9,6 +9,7 @@ from pathlib import Path
 import gradio as gr
 
 import inference
+import private_sessions
 from state import (
     OWNER, STATUSES, AccessDenied, HubState, StoreError,
     add_memory, add_mission, append_exchange, require_owner,
@@ -215,6 +216,7 @@ def service_chat(message: str, request: gr.Request) -> str:
 
 
 def build_demo():
+    private_sessions.install()
     with gr.Blocks(title="Gaïrus | Espace personnel", analytics_enabled=False) as demo:
         with gr.Row(elem_id="topbar"):
             gr.HTML(

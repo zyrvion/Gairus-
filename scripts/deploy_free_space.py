@@ -10,12 +10,16 @@ import subprocess
 import tempfile
 
 from huggingface_hub import CommitOperationAdd, HfApi
+import requests
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "deploy" / "huggingface"
 SPACE = "NostraEmpire/gairus"
 DATASET = "NostraEmpire/gairus-private-state"
-FILES = ("README.md", "requirements.txt", "state.py", "inference.py", "app.py", "style.css")
+FILES = (
+    "README.md", "requirements.txt", "state.py", "inference.py",
+    "private_sessions.py", "app.py", "style.css",
+)
 
 
 def main():
@@ -23,7 +27,11 @@ def main():
     parser.add_argument("--key-file", type=Path)
     args = parser.parse_args()
     api = HfApi()
-    identity = api.whoami()
+    # The approved host proxy injects auth at HTTPS time; this read must not
+    # require exporting a native token into the SDK's local token store.
+    response = requests.get("https://huggingface.co/api/whoami-v2", timeout=30)
+    response.raise_for_status()
+    identity = response.json()
     if identity.get("name") != "NostraEmpire":
         raise SystemExit("Wrong account; no deployment performed.")
     runtime = api.get_space_runtime(SPACE)

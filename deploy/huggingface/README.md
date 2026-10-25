@@ -43,6 +43,10 @@ stockage dans son dépôt privé. Le jeton OAuth reste côté serveur et n'est
 jamais un champ de formulaire, une sortie de l'application ou un message
 destiné au modèle. Chaque opération vérifie aussi l'identité réelle du
 jeton. Aucun autre compte n'est autorisé à lire ou écrire les données.
+Le cookie de connexion ne contient qu'un identifiant opaque signé ;
+les informations OAuth restent en mémoire serveur et disparaissent à l'arrêt.
+Une reconnexion peut donc être nécessaire après un redémarrage, mais les
+conversations et mémoires restent dans le dépôt privé.
 
 Le stockage refuse de fonctionner si le dépôt n'est plus privé. Les mises
 à jour vérifient la révision précédente et réessaient en cas de concurrence.

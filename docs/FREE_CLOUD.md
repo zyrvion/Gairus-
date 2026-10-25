@@ -39,6 +39,11 @@ non privé. Les jetons ne sont ni affichés ni envoyés au modèle
 ([OAuth Spaces](https://huggingface.co/docs/hub/spaces-oauth),
 [OAuth Gradio](https://www.gradio.app/guides/sharing-your-app)).
 
+L'adaptateur remplace la session Gradio par une session serveur : le navigateur
+reçoit seulement un identifiant opaque signé, HttpOnly, Secure et SameSite=Lax.
+Une nouvelle connexion peut être nécessaire après un redémarrage ; cela ne
+supprime pas les données du dépôt privé.
+
 Les écritures utilisent `parent_commit` et réessaient les conflits.
 Un dépôt absent, un réseau indisponible ou une sauvegarde échouée ne doit
 jamais être remplacé silencieusement par une base vide.

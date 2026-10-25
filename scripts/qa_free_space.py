@@ -7,6 +7,7 @@ import sys
 import gradio as gr
 import gradio.oauth
 from fastapi import FastAPI
+import requests
 
 SOURCE = Path(__file__).resolve().parents[1] / "deploy" / "huggingface"
 sys.path.insert(0, str(SOURCE))
@@ -14,6 +15,9 @@ sys.path.insert(0, str(SOURCE))
 # The credential proxy authenticates HTTPS at the approved host; this value is
 # not a real credential. No saved token is extracted or copied into the app.
 gradio.oauth.get_token = lambda: "local-proxy-placeholder-not-a-credential"
+gradio.oauth.whoami = lambda: requests.get(
+    "https://huggingface.co/api/whoami-v2", timeout=30
+).json()
 spec = importlib.util.spec_from_file_location("gairus_free_qa", SOURCE / "app.py")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
