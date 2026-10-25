@@ -36,12 +36,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install -r requirements.txt pytest
+      - run: python -m pip install -r requirements-dev.txt
       - run: python -m compileall -q -x 'backup_repair' .
       - run: python -m pytest tests -q
       - run: git diff --check
 ```
 
 Before relying on this workflow, run it in the repository and inspect its result.
-The 43 tests documented in this repair were run in the cloud working environment,
+The 49 tests documented in this repair were run in the cloud working environment,
 not by an already-enabled GitHub Actions run.

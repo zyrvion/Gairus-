@@ -7,7 +7,8 @@ deployment. Main must not be merged or deployed without the owner's approval.
 
 ## Verified results
 
-43 unit/regression tests pass on Python 3.12.15 and Python 3.14.
+49 unit/regression tests pass on Python 3.12.15 and Python 3.14, including six
+deployment-configuration checks for persistence, secrets and manual rollout.
 All non-backup Python source parses, JavaScript syntax and Bash syntax pass.
 Browser checks at desktop and 375px covered owner sign-in, unauthorized API
 rejection, mission creation, memory saving, page navigation, truthful missing-AI
@@ -59,8 +60,11 @@ the frontend alongside the existing Zyrvion site.
 `deploy/compose.cloud.yml` provides the application, Caddy HTTPS and named
 volumes. It has not been Docker-built or launched here because Docker is not
 available. YAML parsing and application startup have been tested separately.
-The existing Render configuration is not a persistence guarantee; add and verify
-a persistent disk or use the prepared container profile before production.
+The Render Blueprint now prepares a Docker service with a 1 GB persistent disk,
+explicit data paths, generated secrets and automatic deploys disabled.
+See `docs/RENDER_DEPLOYMENT.md` for the selected topology, base budget,
+account-approval requirements and rollout checks. No Render resource has been
+created or purchased, and persistence still requires a real deployment test.
 
 ## Required authorized access
 

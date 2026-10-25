@@ -1,15 +1,29 @@
 services:
   - type: web
     name: gairus
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: ./start.sh
-    healthCheckPath: /health
+    runtime: docker
+    repo: https://github.com/zyrvion/Gairus-
+    branch: repair/cloud-hardening-20261025
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    region: frankfurt
+    plan: 0.5c-512mb
+    numInstances: 1
+    autoDeployTrigger: "off"
+    healthCheckPath: /healthz
+    disk:
+      name: gairus-data
+      mountPath: /app/data
+      sizeGB: 1
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.10
       - key: GAIRUS_NAME
         value: Gaïrus
+      - key: GAIRUS_DATA_DIR
+        value: /app/data
+      - key: GAIRUS_DB
+        value: /app/data/gairus.db
+      - key: GAIRUS_SLACK_MEMORY_DB
+        value: /app/data/slack_memory.db
       - key: GAIRUS_AUTONOMY
         value: "false"
       - key: GAIRUS_APPROVALS
@@ -18,25 +32,11 @@ services:
         value: auto
       - key: GAIRUS_LLM_MODEL
         value: auto
-      - key: GAIRUS_ORTA_API_KEY
-        sync: false
+      - key: GAIRUS_FREE_ONLY
+        value: "true"
       - key: GAIRUS_ADMIN_KEY
-        sync: false
+        generateValue: true
+      - key: GAIRUS_ORTA_API_KEY
+        generateValue: true
       - key: GAIRUS_ALLOWED_ORIGINS
-        value: "https://gairus.zyrvion.io"
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: GOOGLE_API_KEY
-        sync: false
-      - key: GROQ_API_KEY
-        sync: false
-      - key: MISTRAL_API_KEY
-        sync: false
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: CLOUDFLARE_API_TOKEN
-        sync: false
-      - key: CLOUDFLARE_ACCOUNT_ID
-        sync: false
-      - key: ZAI_API_KEY
-        sync: false
+        value: https://gairus.zyrvion.io
