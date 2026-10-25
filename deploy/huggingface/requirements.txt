@@ -1,0 +1,7 @@
+gradio[oauth]==6.30.0
+spaces==0.51.3
+torch==2.13.0
+transformers==5.20.2
+accelerate>=1.10,<2
+huggingface-hub==1.33.0
+requests>=2.32.4,<3

@@ -60,11 +60,11 @@ the frontend alongside the existing Zyrvion site.
 `deploy/compose.cloud.yml` provides the application, Caddy HTTPS and named
 volumes. It has not been Docker-built or launched here because Docker is not
 available. YAML parsing and application startup have been tested separately.
-The Render Blueprint now prepares a Docker service with a 1 GB persistent disk,
-explicit data paths, generated secrets and automatic deploys disabled.
-See `docs/RENDER_DEPLOYMENT.md` for the selected topology, base budget,
-account-approval requirements and rollout checks. No Render resource has been
-created or purchased, and persistence still requires a real deployment test.
+The owner cancelled Render and all spending. The paid Blueprint has been
+removed. The zero-budget adapter in `deploy/huggingface/` uses the owner's
+existing eligible Hugging Face account, free ZeroGPU and a separate private
+dataset repository for durable personal data. See `docs/FREE_CLOUD.md`.
+This adapter does not pretend to activate every tool of the full Flask runtime.
 
 ## Required authorized access
 

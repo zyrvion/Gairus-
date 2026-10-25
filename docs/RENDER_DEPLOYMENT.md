@@ -1,4 +1,14 @@
-# Gairus on Render: prepared deployment
+# Render deployment cancelled
+
+The owner explicitly cancelled Render on 2026-10-25 because the project has
+**no budget**. No Render account, subscription, service, disk or purchase was
+created. The active `render.yaml` Blueprint and its deployment tests have been
+removed to prevent accidental activation.
+
+The text below records the abandoned proposal only. It is not an approved or
+current deployment plan. Use `docs/FREE_CLOUD.md` for the zero-budget route.
+
+## Abandoned proposal
 
 This is a prepared configuration, not a deployed service or purchase.
 The owner delegated the technical choice on 2026-10-25. Recurring charges still
