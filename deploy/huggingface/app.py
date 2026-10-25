@@ -221,7 +221,8 @@ def build_demo():
         with gr.Row(elem_id="topbar"):
             gr.HTML(
                 '<header><p class="eyebrow">ZYRVION / ESPACE PERSONNEL</p>'
-                '<h1>Gaïrus<span class="edition">cloud gratuit</span></h1></header>'
+                '<h1>Gaïrus<span class="edition">cloud gratuit</span></h1></header>',
+                elem_id="gairus-brand",
             )
             gr.LoginButton(
                 value="Se connecter avec Hugging Face",
