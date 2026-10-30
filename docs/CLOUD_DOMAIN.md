@@ -7,12 +7,14 @@ Le 30 octobre 2026, le Fondateur a demandé cette répartition :
 | Adresse | Destination | État du raccordement |
 | --- | --- | --- |
 | `zyrvion.io` et `www.zyrvion.io` | Application Zyrvion existante | À préserver sans modification |
-| `gairus.zyrvion.io` | Gaïrus, hébergé hors de l'appareil | DNS non configuré |
+| `gairus.zyrvion.io` | Redirection gratuite vers le moteur Gaïrus chez Hugging Face | CNAME créé, certificat HTTPS encore en attente |
 | `zarel.zyrvion.io` | ZAREL, application distincte | DNS non configuré, hébergement stable et protection d'accès à vérifier |
 
-Le contrôle direct auprès du serveur DNS autoritatif Spaceship
-`launch1.spaceship.net` a retourné `NXDOMAIN` pour les deux nouveaux
-sous-domaines. L'adresse principale pointe toujours vers `76.76.21.21` et
+Le contrôle initial auprès du serveur DNS autoritatif Spaceship
+`launch1.spaceship.net` retournait `NXDOMAIN` pour les deux nouveaux
+sous-domaines. Après intervention, il retourne `gairus.zyrvion.io CNAME
+zyrvion.github.io` avec un TTL de 1 800 secondes. ZAREL n'a pas été raccordé.
+L'adresse principale pointe toujours vers `76.76.21.21` et
 `www` vers `cname.vercel-dns.com`. La configuration du dépôt Zyrvion existant
 confirme un déploiement Vercel, avec Convex pour le backend.
 Cela explique le montage antérieur : l'application est déployée séparément,
@@ -23,9 +25,12 @@ Le 30 octobre, après autorisation du propriétaire d'utiliser ses e-mails pour
 les connexions, l'accès au gestionnaire Spaceship a été ouvert et la zone
 complète de douze enregistrements a été sauvegardée en privé. Aucune clé API
 supplémentaire n'est nécessaire pour cette intervention par le gestionnaire.
-L'association du nom Gaïrus est en cours ; ne pas confondre cette préparation
-avec une vérification HTTPS terminée. Aucun serveur de noms n'a été changé
-et aucune formule payante n'a été activée.
+Le site GitHub Pages a été associé au nom Gaïrus avant l'ajout de son CNAME.
+La zone relue contient treize enregistrements ; une comparaison structurée
+confirme que les douze entrées antérieures, valeurs, priorités et TTL compris,
+sont inchangées. La page répond en HTTP 200 ; le certificat personnalisé
+HTTPS n'est pas encore émis et ne doit pas être présenté comme opérationnel.
+Aucun serveur de noms n'a été changé et aucune formule payante n'a été activée.
 
 ## Gaïrus : point d'accès gratuit
 
