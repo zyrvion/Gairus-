@@ -19,10 +19,13 @@ Cela explique le montage antérieur : l'application est déployée séparément,
 puis son nom de domaine est raccordé au déploiement. Ce constat ne démontre pas
 l'existence d'un VPS acheté avec le domaine.
 
-L'accès au DNS n'est pas disponible dans cette session. Un formulaire sécurisé
-« Spaceship — DNS de zyrvion.io » a été ouvert ; il est encore en attente.
-Les noms demandés sont autorisés, mais aucun enregistrement DNS n'a été créé,
-aucun serveur de noms n'a été changé et aucune formule payante n'a été activée.
+Le 30 octobre, après autorisation du propriétaire d'utiliser ses e-mails pour
+les connexions, l'accès au gestionnaire Spaceship a été ouvert et la zone
+complète de douze enregistrements a été sauvegardée en privé. Aucune clé API
+supplémentaire n'est nécessaire pour cette intervention par le gestionnaire.
+L'association du nom Gaïrus est en cours ; ne pas confondre cette préparation
+avec une vérification HTTPS terminée. Aucun serveur de noms n'a été changé
+et aucune formule payante n'a été activée.
 
 ## Gaïrus : point d'accès gratuit
 
@@ -37,9 +40,11 @@ Cette page redirige vers `https://nostraempire-gairus.hf.space`.
 Elle n'est pas le serveur d'inférence, un proxy authentifié ou un hébergement
 de données personnelles.
 
-### Raccordement après obtention de l'accès DNS
+### Raccordement par les comptes existants
 
-- Vérifier la propriété du domaine dans le compte GitHub avant l'association.
+- Contrôler le domaine dans le compte Spaceship du propriétaire et sauvegarder
+  la zone avant toute modification. Une vérification de domaine supplémentaire
+  au niveau du compte GitHub reste recommandée lorsqu'elle est disponible.
 - Associer `gairus.zyrvion.io` à ce site Pages.
 - Ensuite seulement, ajouter le CNAME `gairus` vers `zyrvion.github.io`,
   sans nom de dépôt dans la cible.
@@ -51,12 +56,10 @@ de données personnelles.
 Ces règles suivent la
 [documentation GitHub sur les domaines personnalisés](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
 Cette solution fournit une adresse d'accès qui redirige ; elle ne masque
-pas l'adresse Hugging Face après ouverture. Le DNS n'est pas configuré
-tant que l'accès au gestionnaire du domaine n'a pas été obtenu.
-
-Ne pas ajouter maintenant de fichier `CNAME` ni remplacer le domaine du site
-Pages : le lien gratuit existant doit rester utilisable tant que le DNS et
-le certificat du nouveau domaine ne peuvent pas être configurés et vérifiés.
+pas l'adresse Hugging Face après ouverture. Le fichier `docs/CNAME` réserve
+le nom demandé au site Pages de cette branche. L'état final de résolution et
+du certificat doit être vérifié séparément et consigné avant de présenter
+le sous-domaine comme opérationnel.
 
 ## ZAREL : ne pas confondre lien temporaire et hébergement permanent
 
@@ -95,7 +98,8 @@ L'[API officielle Spaceship](https://docs.spaceship.dev/) utilise
 Demander uniquement `dnsrecords:read` et `dnsrecords:write`. Les valeurs restent
 dans le formulaire sécurisé, jamais dans Slack, ce dépôt ou une commande.
 
-Après réception de cet accès :
+L'API est facultative : l'accès au gestionnaire authentifié permet également
+l'intervention autorisée, sans création de nouvelles clés. Dans les deux cas :
 
 - Lire la zone complète, avec pagination, et en conserver une sauvegarde privée.
 - Vérifier les entrées et conflits des seuls noms explicitement concernés.
