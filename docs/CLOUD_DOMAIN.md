@@ -7,7 +7,7 @@ Le 30 octobre 2026, le Fondateur a demandé cette répartition :
 | Adresse | Destination | État du raccordement |
 | --- | --- | --- |
 | `zyrvion.io` et `www.zyrvion.io` | Application Zyrvion existante | À préserver sans modification |
-| `gairus.zyrvion.io` | Redirection gratuite vers le moteur Gaïrus chez Hugging Face | CNAME créé, certificat HTTPS encore en attente |
+| `gairus.zyrvion.io` | Redirection gratuite vers le moteur Gaïrus chez Hugging Face | HTTPS actif, ouverture réelle vérifiée |
 | `zarel.zyrvion.io` | ZAREL, application distincte | DNS non configuré, hébergement stable et protection d'accès à vérifier |
 
 Le contrôle initial auprès du serveur DNS autoritatif Spaceship
@@ -28,9 +28,23 @@ supplémentaire n'est nécessaire pour cette intervention par le gestionnaire.
 Le site GitHub Pages a été associé au nom Gaïrus avant l'ajout de son CNAME.
 La zone relue contient treize enregistrements ; une comparaison structurée
 confirme que les douze entrées antérieures, valeurs, priorités et TTL compris,
-sont inchangées. La page répond en HTTP 200 ; le certificat personnalisé
-HTTPS n'est pas encore émis et ne doit pas être présenté comme opérationnel.
+sont inchangées. La page répond désormais en HTTPS 200 avec un certificat
+valide ; l'adresse HTTP redirige vers HTTPS avec le statut 301.
 Aucun serveur de noms n'a été changé et aucune formule payante n'a été activée.
+
+La vérification GitHub suivante confirme désormais `dns_resolves: true`,
+`is_valid: true` et `is_https_eligible: true`. Le contrôle TLS strict a
+néanmoins encore rejeté le certificat présenté. Après cette validation DNS,
+la seule association du domaine au site Pages a été retirée puis rétablie,
+selon la
+[procédure officielle de dépannage HTTPS](https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https).
+GitHub a d'abord retourné un certificat à l'état `new`, puis `approved`,
+valable jusqu'au 28 janvier 2027. Après réussite du contrôle TLS strict,
+`https_enforced` a été activé et relu à `true`. Le navigateur a confirmé
+que l'ouverture de `https://gairus.zyrvion.io` aboutit bien à l'interface
+Gaïrus, sur `https://nostraempire-gairus.hf.space/`, avec son bouton de
+connexion Hugging Face. Le domaine est rétabli, le DNS n'a pas été modifié
+et `main` a été revérifiée inchangée après l'opération.
 
 ## Gaïrus : point d'accès gratuit
 
@@ -95,6 +109,23 @@ Avant de raccorder `zarel.zyrvion.io` :
 Un nom DNS stable ne rend pas permanente une séance de calcul temporaire.
 Le raccordement au domaine et l'hébergement continu sont deux vérifications
 distinctes ; aucune disponibilité permanente n'est affirmée ici.
+
+Le code sauvegardé du déploiement ZAREL a été retrouvé dans le compte du
+propriétaire, sans exécution ni modification. Ses métadonnées confirment un
+notebook privé, mais cette confidentialité du code ne démontre pas celle
+de l'interface Gradio partagée : la configuration de cette interface reste
+lisible au contrôle anonyme. Les travaux ZAREL existants ne sont pas
+redémarrés pour les besoins du raccordement de Gaïrus.
+
+## Slack : connexion Gaïrus non activée
+
+La connexion officielle au workspace du propriétaire a été tentée avec son
+autorisation. La vérification visuelle a expiré et aucun accès administrateur
+Slack n'a été obtenu dans cette tâche. Il ne faut pas répéter indéfiniment
+ce parcours, annoncer un bot Gaïrus connecté, ni confondre une installation
+ZAREL préparée dans d'autres travaux avec l'application distincte Gaïrus.
+Aucun jeton d'une autre application n'est réutilisé et aucune autorisation
+supplémentaire n'a été accordée.
 
 ## Accès Spaceship et garde-fous
 
