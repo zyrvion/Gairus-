@@ -1,6 +1,7 @@
 """Bounded agent: objective -> validated plan -> tools -> checked real artifacts."""
 
 import json
+import textwrap
 import uuid
 
 from media_tools import checked_file, presentation, speech
@@ -21,6 +22,8 @@ PLANNER = (
     "ou un producteur de plans. Une API de service privée existe déjà. "
     "Slack, les connecteurs externes et les scènes vidéo génératives ne sont "
     "pas encore activés. Ne confonds pas absence de connecteurs et absence d'API. "
+    "Aucune disponibilité 24/7 ni plateforme commerciale multi-clients "
+    "n'est garantie. Tu ne peux pas déployer un serveur ou activer une facturation. "
     "Retourne uniquement un objet JSON avec exactement kind,title,content,slides. "
     "kind vaut document, voice, presentation ou unsupported. title: maximum 90 caractères. "
     "content: le vrai document ou la vraie narration en français, pas un plan "
@@ -87,10 +90,45 @@ def execute(objective, generate, requested="auto", speech_tool=speech, video_too
     plan = validate_plan(raw)
     if requested != "auto" and plan["kind"] != requested:
         raise StoreError("Le modèle n'a pas respecté le format demandé. Aucun outil exécuté.")
+    return _execute_plan(plan, objective, "model", speech_tool, video_tool)
+
+
+def execute_text(content, requested, speech_tool=speech, video_tool=presentation):
+    """Explicit tools-only mode: user-supplied content, no model or GPU call."""
+    if requested not in KINDS:
+        raise StoreError(
+            "En mode texte fourni, choisis Document, Voix française ou "
+            "Vidéo de présentation. Aucun outil exécuté."
+        )
+    content = text(content, "Le texte à transformer", 1200)
+    titles = {
+        "document": "Document Gaïrus", "voice": "Voix française",
+        "presentation": "Présentation narrée",
+    }
+    slides = []
+    if requested == "presentation":
+        slides = textwrap.wrap(
+            " ".join(content.split()), width=240,
+            break_long_words=True, break_on_hyphens=False,
+        )
+        if len(slides) > 3:
+            raise StoreError(
+                "Le texte dépasse trois diapositives. Raccourcis-le ; "
+                "aucun passage n'a été supprimé silencieusement."
+            )
+    plan = validate_plan({
+        "kind": requested, "title": titles[requested],
+        "content": content, "slides": slides,
+    })
+    return _execute_plan(plan, content, "user_text", speech_tool, video_tool)
+
+
+def _execute_plan(plan, objective, planning, speech_tool, video_tool):
     job = {
         "id": uuid.uuid4().hex, "objective": objective, "title": plan["title"],
         "kind": plan["kind"], "status": "running", "started_at": now(),
         "journal": [], "artifacts": [], "external_actions": False, "cost": 0,
+        "planning": planning, "gpu_required": planning == "model",
     }
     files = []
 

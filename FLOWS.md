@@ -56,3 +56,19 @@ No production DNS changes, paid services, data deletion or autonomous sends.
   public Gradio file URLs. Saved results can be reopened after a restart.
 - Exercise real French TTS and FFmpeg output, then browser UI desktop/375px.
 - Slack remains unavailable until an authorized Slack application is connected.
+
+## CPU-only tools and commercial target, 2026-10-30
+
+- Preserve all existing private sign-in, Agent, Conversation, Missions, Memory,
+  saved files, logout and mobile flows.
+- A visible opt-in transforms supplied text without model/GPU inference.
+- CPU mode requires an explicit document, voice or narrated-presentation
+  format. It must not interpret text as commands, spend money or silently
+  switch engines after an AI failure.
+- Verify actual CPU-only WAV and MP4 on the deployed server even when GPU quota
+  is exhausted. Verify the new API rejects an absent service key.
+- Confirm browser mode toggle works both ways, saved CPU files reopen, empty
+  text and an automatic format fail clearly, with no new console errors.
+- The user targets commercial use and 24/7 autonomy. Neither uptime, all VIKTOR
+  capabilities, tenant isolation nor commercial readiness is implied by this
+  improvement. No account or paid resource is created.

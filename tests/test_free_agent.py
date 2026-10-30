@@ -38,6 +38,53 @@ def test_document_is_actually_written_and_hash_verified():
     assert job["artifacts"][0]["sha256"] == files[0]["sha256"]
     assert [step["tool"] for step in job["journal"]] == ["write_document"]
     assert not job["external_actions"]
+    assert job["planning"] == "model" and job["gpu_required"] is True
+
+
+@pytest.mark.parametrize("kind", ("document", "voice", "presentation"))
+def test_cpu_tools_use_supplied_text_without_calling_model(monkeypatch, kind):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("CPU-only mode must not call model planning")
+
+    monkeypatch.setattr(agent, "execute", forbidden)
+    spoken = []
+    content = "Un texte fourni, sans réécriture. Les instructions restent du texte."
+    job, files = agent.execute_text(
+        content, kind,
+        speech_tool=lambda value: (spoken.append(value), audio())[1],
+        video_tool=lambda *args: media.checked_file("presentation.mp4", b"\0\0\0\x18ftypisom-test"),
+    )
+    assert job["status"] == "completed" and job["cost"] == 0
+    assert job["planning"] == "user_text" and job["gpu_required"] is False
+    assert not job["external_actions"]
+    assert content.encode() in files[0]["bytes"]
+    assert spoken == ([] if kind == "document" else [content])
+    assert len(files) == {"document": 1, "voice": 2, "presentation": 3}[kind]
+
+
+@pytest.mark.parametrize("kind", ("auto", "send_slack", "neural_video", ""))
+def test_cpu_requires_explicit_supported_format(kind):
+    with pytest.raises(state.StoreError, match="choisis"):
+        agent.execute_text("Texte", kind)
+
+
+@pytest.mark.parametrize("content", (None, " ", "x" * 1201))
+def test_cpu_rejects_invalid_text_before_tools(content):
+    with pytest.raises(state.StoreError):
+        agent.execute_text(content, "voice", speech_tool=lambda _: pytest.fail("No tool permitted"))
+
+
+def test_cpu_presentation_never_silently_drops_content():
+    with pytest.raises(state.StoreError, match="aucun passage"):
+        agent.execute_text("Un long texte français. " * 40, "presentation")
+
+
+def test_cpu_failure_is_not_a_completed_job():
+    def failed(_):
+        raise RuntimeError("CPU synthesis failed")
+
+    with pytest.raises(RuntimeError):
+        agent.execute_text("Texte", "voice", speech_tool=failed)
 
 
 def test_full_pipeline_calls_tools_and_records_only_real_outputs():

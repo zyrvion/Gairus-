@@ -16,9 +16,10 @@ ZeroGPU. Le quota publié pour un utilisateur connecté gratuit est de cinq
 minutes de GPU par jour ; attente et mise en veille restent possibles
 ([documentation officielle](https://huggingface.co/docs/hub/spaces-zerogpu)).
 Il ne faut jamais présenter cette offre comme illimitée ou garantie 24h/24.
-Les Spaces Docker sur CPU ne sont pas une solution gratuite pour ce compte,
-car leur création requiert maintenant un abonnement
-([règles de création des Spaces](https://huggingface.co/docs/hub/spaces-overview)).
+Le choix ZeroGPU ne permet pas de conclure que toute autre offre gratuite
+est disponible pour ce compte ou adaptée à un agent permanent. Vérifier
+les conditions, les quotas et la facturation avant tout changement
+([présentation des Spaces](https://huggingface.co/docs/hub/spaces-overview)).
 
 ## Source et données
 
@@ -53,6 +54,10 @@ jamais être remplacé silencieusement par une base vide.
 - Agent borné : objectif, plan JSON validé, exécution d'outils gratuits, preuves
   et fichiers réels. Document Markdown, voix française Kokoro sur CPU et MP4
   de diapositives narrées avec FFmpeg, pas de scènes vidéo générées par IA.
+- Mode explicite « texte fourni » : mêmes outils CPU, sans appel au modèle
+  ni au GPU. Le texte est utilisé tel quel, sans rédaction ni planification IA.
+  Ce mode n'est pas une bascule cachée après une erreur et ne supprime pas
+  la mise en veille du serveur ni les limites de temps/taille des fichiers.
 - Travaux et fichiers sauvegardés atomiquement dans le dataset privé ; lecture
   ultérieure vérifie SHA-256, taille et type. Aucun cache public Gradio.
 - Conversation réelle avec Qwen3-4B, rédaction, analyse de texte et code.
@@ -62,11 +67,15 @@ jamais être remplacé silencieusement par une base vide.
   par une clé de service aléatoire d'au moins quarante caractères.
 - API `/service_agent` protégée par la même clé, sans sauvegarde implicite.
   Slack n'est pas raccordé et aucune livraison de fichiers Slack n'est annoncée.
+- API `/service_cpu` protégée, sans état personnel ni inférence GPU.
 - Pas de navigateur autonome, d'exécution de code, d'envoi externe ou d'achat.
 - Le runtime Flask complet reste disponible dans le dépôt, mais n'est pas
   prétendu intégralement activé dans ce mode gratuit.
 
 La parité avec VIKTOR n'est pas atteinte par ce premier mode gratuit.
+L'objectif du propriétaire inclut un agent commercial à ses propres tarifs
+et un fonctionnement 24/7. Cette version n'a ni isolation multi-clients,
+ni facturation, ni garantie de disponibilité et n'est pas annoncée prête à vendre.
 Les exports personnels VIKTOR et l'app terrain restent à migrer séparément.
 Le DNS de `zyrvion.io` n'est pas modifié sans accès Spaceship ; aucune autre
 application Zyrvion n'est écrasée.

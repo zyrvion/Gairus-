@@ -34,6 +34,7 @@ def main():
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--url", default="https://nostraempire-gairus.hf.space")
     parser.add_argument("--kind", choices=("document", "voice", "presentation"), default="presentation")
+    parser.add_argument("--cpu-only", action="store_true")
     args = parser.parse_args()
     if args.key_file.stat().st_mode & 0o077:
         raise SystemExit("Unsafe service-key permissions.")
@@ -45,11 +46,22 @@ def main():
         "presentation": "Crée une courte présentation narrée de Gaïrus : objectifs, outils gratuits et limites. "
                         "Deux diapositives. N'annonce aucune intégration Slack opérationnelle.",
     }
+    if args.cpu_only:
+        objectives = dict.fromkeys(
+            objectives,
+            "Gaïrus transforme ce texte en fichier dans le cloud. "
+            "Ce test utilise uniquement les outils CPU, sans appel au modèle IA.",
+        )
     started = time.monotonic()
-    result = client.predict(objectives[args.kind], args.kind, api_name="/service_agent")
+    result = client.predict(
+        objectives[args.kind], args.kind,
+        api_name="/service_cpu" if args.cpu_only else "/service_agent",
+    )
     job = result["job"]
     assert job["status"] == "completed" and job["cost"] == 0 and not result["saved"]
     assert not job["external_actions"] and job["kind"] == args.kind
+    assert job["planning"] == ("user_text" if args.cpu_only else "model")
+    assert job["gpu_required"] is (not args.cpu_only)
     downloads = Downloads()
     downloads.feed(result["preview_html"])
     assert set(downloads.files) == {item["name"] for item in job["artifacts"]}
@@ -64,6 +76,7 @@ def main():
         "verified_files": [item["name"] for item in job["artifacts"]],
         "elapsed_seconds": round(time.monotonic() - started, 2),
         "external_actions": False, "personal_storage_written": False,
+        "planning": job["planning"], "gpu_required": job["gpu_required"],
     })
 
 

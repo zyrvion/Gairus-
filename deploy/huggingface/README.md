@@ -37,6 +37,13 @@ authentifiée, jamais dans le cache de fichiers public de Gradio.
 Les médias sont stockés comme texte base64 borné dans des fichiers `.b64`
 privés, puis décodés et vérifiés avant de restituer les vrais WAV/MP4.
 
+Le mode explicite « Utiliser mon texte tel quel, sans IA ni quota GPU »
+transforme le texte fourni avec les mêmes outils CPU. Il ne rédige pas,
+ne planifie pas et n'appelle pas le modèle. Choisir Document, Voix française
+ou Vidéo de présentation narrée. Les diapositives sont limitées à trois
+blocs de 240 caractères ; un texte trop long est refusé, pas tronqué.
+Ce mode n'est pas un secours caché et ne garantit pas la disponibilité du serveur.
+
 La voix française standard `ff_siwis` utilise
 [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) sur CPU et les
 [poids ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX)
@@ -79,7 +86,7 @@ Un échec de sauvegarde n'est jamais présenté comme une sauvegarde réussie.
 
 ## Limites de cette version
 
-Les plans générés sont des propositions, pas des actions exécutées.
+Les plans de l'onglet Missions sont des propositions, pas des actions exécutées.
 Aucun message externe, achat, commande arbitraire, changement GitHub ou DNS
 n'est exécuté par le modèle. Seul l'encodage FFmpeg à arguments fixes est
 autorisé dans l'outil vidéo. La navigation web et les intégrations externes
@@ -88,6 +95,10 @@ Ce n'est pas une copie complète de VIKTOR.
 Slack n'est pas connecté : il manque l'application et ses autorisations.
 L'API `/service_agent` est privée par clé, sans mémoire ; elle ne constitue
 pas à elle seule une intégration Slack.
+L'API `/service_cpu` utilise la même protection, sans appel au modèle,
+sans mémoire ni accès aux données personnelles.
+Cette version est un espace personnel, pas une plateforme commerciale
+multi-clients : ni isolation de clients, ni facturation, ni garantie 24/7.
 
 Le sous-domaine `gairus.zyrvion.io`, la migration des projets VIKTOR et
 l'app terrain restent des opérations distinctes. Le site Zyrvion existant
