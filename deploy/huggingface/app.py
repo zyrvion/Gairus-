@@ -270,9 +270,12 @@ def reopen_run(run_id, profile: gr.OAuthProfile, token: gr.OAuthToken):
 
 def service_agent(objective: str, output_kind: str, request: gr.Request) -> dict:
     """Key-protected stateless test/bridge API; never reads personal state."""
-    require_service_key(request.headers.get("authorization", ""), os.getenv("GAIRUS_SERVICE_KEY", ""))
-    job, files = free_agent.execute(objective, inference.generate, requested=output_kind)
-    return {"job": job, "preview_html": private_preview(files), "saved": False}
+    try:
+        require_service_key(request.headers.get("authorization", ""), os.getenv("GAIRUS_SERVICE_KEY", ""))
+        job, files = free_agent.execute(objective, inference.generate, requested=output_kind)
+        return {"job": job, "preview_html": private_preview(files), "saved": False}
+    except Exception as exc:
+        fail(exc)
 
 
 def build_demo():
