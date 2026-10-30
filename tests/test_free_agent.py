@@ -63,7 +63,8 @@ def test_full_pipeline_calls_tools_and_records_only_real_outputs():
 
 @pytest.mark.parametrize("raw", [
     "pas du JSON", {"kind": "send_slack"}, {**plan(), "shell": "touch /tmp/unsafe"},
-    {**plan(), "kind": "neural_video"}, {**plan(), "content": "x" * 1201},
+    {**plan(), "kind": "neural_video"}, {**plan(), "kind": "unsupported"},
+    {**plan(), "content": "x" * 1201},
     {**plan(), "slides": "not a list"}, {**plan("presentation"), "slides": []},
 ])
 def test_invalid_model_plans_fail_before_any_tool(raw):
