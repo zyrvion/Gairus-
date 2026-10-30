@@ -24,9 +24,10 @@ from autonomy import (
     reject,
     run_cycle,
 )
-from flask import Flask, jsonify, request, render_template, send_from_directory
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from security.web_auth import install_web_auth
+from pwa import pwa_bp
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -44,6 +45,7 @@ allowed_origins = [
 if allowed_origins:
     CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 install_web_auth(app)
+app.register_blueprint(pwa_bp)
 
 NAME = os.getenv("GAIRUS_NAME", "Gaïrus")
 AUTONOMY = os.getenv("GAIRUS_AUTONOMY", "false").lower() == "true"
@@ -325,22 +327,6 @@ def index():
     return render_template("index.html")
 
 
-
-@app.route("/manifest.json")
-def manifest():
-    return send_from_directory("static", "manifest.json")
-
-@app.route("/sw.js")
-def service_worker():
-    return send_from_directory("static", "sw.js")
-
-@app.route("/icon-192.png")
-def icon_192():
-    return send_from_directory("static", "icon-192.png")
-
-@app.route("/icon-512.png")
-def icon_512():
-    return send_from_directory("static", "icon-512.png")
 
 @app.route("/health")
 @app.route("/healthz")

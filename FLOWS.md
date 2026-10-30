@@ -40,6 +40,50 @@ at baseline. Local commits are not upstream changes. A Computer preview is not a
 permanent deployment. VIKTOR's private account has not been accessed or exported.
 No production DNS changes, paid services, data deletion or autonomous sends.
 
+## Own application and stable installation, 2026-10-30
+
+The owner now explicitly rejects Hugging Face as the target platform. Preserve
+the old service until a replacement has passed real checks; a cosmetic wrapper
+or a redirect is not migration. The stable target is gairus.zyrvion.io, separate
+from Zyrvion. No paid resources, main merge, or unrelated app changes.
+
+Baseline inspection: original Flask login and application shell opened on an
+isolated QA server, not the user's data. The existing manifest has no id/icons,
+its icon files are absent, the old worker is not registered, and its cache-first
+strategy would retain obsolete code if activated. The login key stays in RAM.
+
+- Open the original app on desktop and 375px. Keep the private login, all
+  navigation views, mission creation, memory save/reopen, explicit missing-model
+  response, and logout. No real external messages or purchases during QA.
+- Manifest: stable id, start URL and scope "/", standalone, French, and actual
+  192/512 icons that preserve the existing typographic G.
+- Installation: offer the browser's native install prompt when available;
+  otherwise explain the browser's Add to Home Screen option. Do not imply the
+  app is installed just because a button was clicked.
+- Update: register the same-origin worker, bypass HTTP cache when checking it,
+  detect a waiting update, and activate it only after an explicit user action.
+  Never silently reload an objective the owner is typing.
+- Offline: show a public offline page. No cached authenticated shell, memory,
+  mission, key, API response, generated file, or automatically replayed task.
+- Privacy: cached resources must be a small exact public allowlist. API requests,
+  mutations, cross-origin fetches and Authorization requests bypass the worker.
+- Cache upgrade: remove only old Gaïrus caches, leave unrelated caches intact.
+- Verify reconnect and update lifecycle, offline/private API rejection, invalid
+  sign-in, desktop/mobile/desktop resize, and absence of new console errors.
+- Retain objective/title/note/chat text and cursor during automatic refresh of
+  the same view. Clear a successfully saved form, not one still being edited.
+- Vercel access, durable storage, actual model/voice/video providers and Slack
+  credentials are independent deployment gates. Local PWA checks do not prove
+  those integrations work or guarantee continuous execution.
+
+Verification: 122 Python tests passed with isolated data. Browser flows passed
+for all original navigation views, memory save/reopen, mission creation, missing
+AI provider, invalid login/logout, desktop/mobile resize, real periodic draft
+retention, offline/reconnect and explicit waiting-worker update. The latter uses
+the isolated `scripts/qa_pwa_server.py`, which serves two worker revisions without
+changing production source or mocking provider success. Effective phone install
+is not verified; Chromium's ephemeral context reports `in-incognito`.
+
 ## Executable agent and free media checks, 2026-10-30
 
 - Keep sign-in, conversations, manual missions, memory, owner checks and logout.

@@ -109,7 +109,7 @@ function shell(content){
       <div class="topTitle">${title()}</div>
       <div class="online"><i></i> ${state.data.status.status==="online"?"Serveur connecté":"Connexion en cours"}</div>
     </header>
-    <div class="page">${content}</div>
+    <div class="page" data-current-page="${esc(state.page)}">${content}</div>
    </main>
  </div>`;
 }
@@ -120,9 +120,25 @@ function title(){
 
 function render(){
  if(!authenticated){renderLogin();return}
+ // A refresh must not erase a mission, memory note or chat draft being typed.
+ const samePage=document.querySelector(".page")?.dataset.currentPage===state.page;
+ const draftFields=samePage?["chatInput","missionTitle","missionObjective","mem"]
+  .map(id=>document.getElementById(id)).filter(Boolean).map(el=>({
+   id:el.id,value:el.value,focused:document.activeElement===el,
+   start:el.selectionStart,end:el.selectionEnd
+  })):[];
  const pages={missions, tasks, actions, approvals, memory, tools, events, health, settings};
- if(state.page==="chat"){renderChat();return}
- shell(`<section class="section">${pages[state.page]?pages[state.page]():missions()}</section>`);
+ if(state.page==="chat")renderChat();
+ else shell(`<section class="section">${pages[state.page]?pages[state.page]():missions()}</section>`);
+ for(const draft of draftFields){
+  const el=document.getElementById(draft.id);
+  if(!el)continue;
+  el.value=draft.value;
+  if(draft.focused){
+   el.focus({preventScroll:true});
+   if(draft.start!==null)el.setSelectionRange(draft.start,draft.end);
+  }
+ }
 }
 
 function renderLogin(){
@@ -390,6 +406,10 @@ async function createMission(){
    method:"POST",
    body:JSON.stringify({title:title||objective,objective})
   });
+  for(const id of ["missionTitle","missionObjective"]){
+   const field=document.getElementById(id);
+   if(field)field.value="";
+  }
   await loadData();
   state.page="missions";
   location.hash="missions";
@@ -422,6 +442,7 @@ async function saveMemory(){
 
  try{
   await api("/memory",{method:"POST",body:JSON.stringify({content,memory:content})});
+  el.value="";
   await loadData();
   render();
  }catch(e){alert(e.message)}

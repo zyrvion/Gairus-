@@ -7,9 +7,22 @@
 <meta name="description" content="Gaïrus, employé IA autonome">
 <title>Gaïrus</title>
 <link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="apple-mobile-web-app-title" content="Gaïrus">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="/static/css/gairus.css?v=4">
+<link rel="stylesheet" href="/static/css/pwa.css?v=1">
 </head>
 <body>
+<aside id="pwaPanel" aria-label="Installation et mises à jour">
+  <div class="pwaRow">
+    <span id="pwaStatus" role="status">Gaïrus · Web et écran d’accueil, à la même adresse</span>
+    <button id="pwaInstall" type="button" aria-controls="pwaHelp" aria-expanded="false">Installer Gaïrus</button>
+    <button id="pwaUpdate" type="button" hidden>Actualiser Gaïrus</button>
+  </div>
+  <p id="pwaHelp" hidden>Sur Android, ouvrez le menu du navigateur puis « Installer l’application » ou « Ajouter à l’écran d’accueil ». Sur iPhone, ouvrez Gaïrus dans Safari, puis Partager et « Sur l’écran d’accueil ». Le même raccourci reçoit les mises à jour, sans changer de lien.</p>
+</aside>
 <div id="app">
   <div class="boot">
     <div class="logo">G</div>
@@ -17,6 +30,7 @@
     <p>Chargement de votre espace de travail...</p>
   </div>
 </div>
-<script src="/static/js/gairus.js?v=4"></script>
+<script src="/static/js/gairus.js?v=5"></script>
+<script src="/static/js/pwa.js?v=1"></script>
 </body>
 </html>
