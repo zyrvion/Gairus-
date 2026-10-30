@@ -50,7 +50,7 @@ def main():
         objectives = dict.fromkeys(
             objectives,
             "Gaïrus transforme ce texte en fichier dans le cloud. "
-            "Ce test utilise uniquement les outils CPU, sans appel au modèle IA.",
+            "Ce test utilise uniquement les outils CPU, sans appel au modèle de rédaction.",
         )
     started = time.monotonic()
     result = client.predict(

@@ -245,7 +245,7 @@ def service_chat(message: str, request: gr.Request) -> str:
 def run_view(job):
     lines = [f"### {html.escape(job['title'])}", "Exécution terminée et fichiers vérifiés."]
     if job.get("planning") == "user_text":
-        lines.append("Mode texte fourni : outils CPU, sans appel au modèle IA ni au GPU.")
+        lines.append("Mode texte fourni : outils CPU, sans planification IA ni GPU.")
     lines.extend(
         f"- `{entry['tool']}` : {entry['size']} octets, SHA-256 `{entry['sha256'][:16]}…`."
         for entry in job["journal"]
@@ -303,7 +303,7 @@ def service_agent(objective: str, output_kind: str, request: gr.Request) -> dict
 
 
 def service_cpu(content: str, output_kind: str, request: gr.Request) -> dict:
-    """Key-protected CPU-only tools; no model, personal state or GPU quota."""
+    """Key-protected CPU-only tools; no LLM, personal state or GPU quota."""
     try:
         require_service_key(request.headers.get("authorization", ""), os.getenv("GAIRUS_SERVICE_KEY", ""))
         job, files = free_agent.execute_text(content, requested=output_kind)
@@ -345,7 +345,7 @@ def build_demo():
                         elem_id="agent-objective",
                     )
                     cpu_only = gr.Checkbox(
-                        label="Utiliser mon texte tel quel, sans IA ni quota GPU",
+                        label="Utiliser mon texte tel quel, sans rédaction IA ni quota GPU",
                         value=False, elem_id="cpu-mode",
                         info="Mode outils CPU : aucune rédaction par l'IA. Choisis un format ; "
                              "pour la vidéo, le texte est réparti sur trois diapositives maximum.",
@@ -404,7 +404,7 @@ def build_demo():
                 "L'onglet Agent exécute des outils locaux pour produire des fichiers. "
                 "Il ne navigue pas sur le web et ne modifie pas tes comptes.\n\n"
                 "La voix Kokoro fonctionne sur CPU, sans API ElevenLabs. "
-                "Le mode texte fourni ne fait aucun appel au modèle ni au GPU ; "
+                "Le mode texte fourni ne fait aucun appel au modèle de rédaction ni au GPU ; "
                 "il ne planifie pas et ne réécrit pas tes instructions. "
                 "Le MP4 est une présentation narrée, pas de la génération de scènes par IA. "
                 "Aucun clonage vocal, agent Slack, ni exécution permanente n'est annoncé.\n\n"

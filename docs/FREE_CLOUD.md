@@ -54,7 +54,7 @@ jamais être remplacé silencieusement par une base vide.
 - Agent borné : objectif, plan JSON validé, exécution d'outils gratuits, preuves
   et fichiers réels. Document Markdown, voix française Kokoro sur CPU et MP4
   de diapositives narrées avec FFmpeg, pas de scènes vidéo générées par IA.
-- Mode explicite « texte fourni » : mêmes outils CPU, sans appel au modèle
+- Mode explicite « texte fourni » : mêmes outils CPU, sans appel au modèle de rédaction
   ni au GPU. Le texte est utilisé tel quel, sans rédaction ni planification IA.
   Ce mode n'est pas une bascule cachée après une erreur et ne supprime pas
   la mise en veille du serveur ni les limites de temps/taille des fichiers.
@@ -68,6 +68,7 @@ jamais être remplacé silencieusement par une base vide.
 - API `/service_agent` protégée par la même clé, sans sauvegarde implicite.
   Slack n'est pas raccordé et aucune livraison de fichiers Slack n'est annoncée.
 - API `/service_cpu` protégée, sans état personnel ni inférence GPU.
+  La synthèse vocale reste un modèle neuronal local sur CPU.
 - Pas de navigateur autonome, d'exécution de code, d'envoi externe ou d'achat.
 - Le runtime Flask complet reste disponible dans le dépôt, mais n'est pas
   prétendu intégralement activé dans ce mode gratuit.

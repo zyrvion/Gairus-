@@ -94,7 +94,7 @@ def execute(objective, generate, requested="auto", speech_tool=speech, video_too
 
 
 def execute_text(content, requested, speech_tool=speech, video_tool=presentation):
-    """Explicit tools-only mode: user-supplied content, no model or GPU call."""
+    """Explicit tools-only mode: user-supplied content, no LLM or GPU call."""
     if requested not in KINDS:
         raise StoreError(
             "En mode texte fourni, choisis Document, Voix française ou "

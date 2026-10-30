@@ -37,9 +37,9 @@ authentifiée, jamais dans le cache de fichiers public de Gradio.
 Les médias sont stockés comme texte base64 borné dans des fichiers `.b64`
 privés, puis décodés et vérifiés avant de restituer les vrais WAV/MP4.
 
-Le mode explicite « Utiliser mon texte tel quel, sans IA ni quota GPU »
+Le mode explicite « Utiliser mon texte tel quel, sans rédaction IA ni quota GPU »
 transforme le texte fourni avec les mêmes outils CPU. Il ne rédige pas,
-ne planifie pas et n'appelle pas le modèle. Choisir Document, Voix française
+ne planifie pas et n'appelle pas le modèle de rédaction. Choisir Document, Voix française
 ou Vidéo de présentation narrée. Les diapositives sont limitées à trois
 blocs de 240 caractères ; un texte trop long est refusé, pas tronqué.
 Ce mode n'est pas un secours caché et ne garantit pas la disponibilité du serveur.
@@ -95,7 +95,7 @@ Ce n'est pas une copie complète de VIKTOR.
 Slack n'est pas connecté : il manque l'application et ses autorisations.
 L'API `/service_agent` est privée par clé, sans mémoire ; elle ne constitue
 pas à elle seule une intégration Slack.
-L'API `/service_cpu` utilise la même protection, sans appel au modèle,
+L'API `/service_cpu` utilise la même protection, sans appel au modèle de rédaction,
 sans mémoire ni accès aux données personnelles.
 Cette version est un espace personnel, pas une plateforme commerciale
 multi-clients : ni isolation de clients, ni facturation, ni garantie 24/7.
