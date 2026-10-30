@@ -1,9 +1,12 @@
-const API="/api";
+const API=window.GAIRUS_API_BASE||"/api";
+let accessKey="";
+let authenticated=false;
+let serverError="";
 
 const state={
  page:location.hash.slice(1)||"chat",
  data:{status:{},missions:[],tasks:[],actions:[],approvals:[],events:[],memory:[]},
- messages:JSON.parse(localStorage.getItem("gairus_chat")||"[]")
+ messages:[]
 };
 
 const nav=[
@@ -43,16 +46,25 @@ function ident(x){
 }
 
 async function api(path,options={}){
- const opts={...options,headers:{"Content-Type":"application/json",...(options.headers||{})}};
+ const opts={...options,headers:{
+  "Content-Type":"application/json",
+  ...(accessKey?{"Authorization":"Bearer "+accessKey}:{}),
+  ...(options.headers||{})
+ }};
  const r=await fetch(API+path,opts);
  const text=await r.text();
  let data={};
  try{data=text?JSON.parse(text):{}}catch{data={raw:text}};
- if(!r.ok)throw new Error(data.error||data.message||text||"Erreur serveur");
+ if(!r.ok){
+  const error=new Error(data.message||data.error||text||"Erreur serveur");
+  error.status=r.status;
+  throw error;
+ }
  return data;
 }
 
 async function loadData(){
+ if(!authenticated)return;
  const jobs=await Promise.allSettled([
   api("/status"),
   api("/autonomy/missions").catch(()=>api("/missions")),
@@ -95,9 +107,9 @@ function shell(content){
     <header class="top">
       <button class="menu" data-action="menu">☰</button>
       <div class="topTitle">${title()}</div>
-      <div class="online"><i></i> Gaïrus actif</div>
+      <div class="online"><i></i> ${state.data.status.status==="online"?"Serveur connecté":"Connexion en cours"}</div>
     </header>
-    <div class="page">${content}</div>
+    <div class="page" data-current-page="${esc(state.page)}">${content}</div>
    </main>
  </div>`;
 }
@@ -107,9 +119,59 @@ function title(){
 }
 
 function render(){
+ if(!authenticated){renderLogin();return}
+ // A refresh must not erase a mission, memory note or chat draft being typed.
+ const samePage=document.querySelector(".page")?.dataset.currentPage===state.page;
+ const draftFields=samePage?["chatInput","missionTitle","missionObjective","mem"]
+  .map(id=>document.getElementById(id)).filter(Boolean).map(el=>({
+   id:el.id,value:el.value,focused:document.activeElement===el,
+   start:el.selectionStart,end:el.selectionEnd
+  })):[];
  const pages={missions, tasks, actions, approvals, memory, tools, events, health, settings};
- if(state.page==="chat"){renderChat();return}
- shell(`<section class="section">${pages[state.page]?pages[state.page]():missions()}</section>`);
+ if(state.page==="chat")renderChat();
+ else shell(`<section class="section">${pages[state.page]?pages[state.page]():missions()}</section>`);
+ for(const draft of draftFields){
+  const el=document.getElementById(draft.id);
+  if(!el)continue;
+  el.value=draft.value;
+  if(draft.focused){
+   el.focus({preventScroll:true});
+   if(draft.start!==null)el.setSelectionRange(draft.start,draft.end);
+  }
+ }
+}
+
+function renderLogin(){
+ document.querySelector("#app").innerHTML=`
+ <main class="authPage"><section class="authCard" aria-labelledby="authTitle">
+  <div class="logo">G</div>
+  <p class="authEyebrow">ZYRVION / GAÏRUS</p>
+  <h1 id="authTitle">Votre espace privé.</h1>
+  <p>Le serveur cloud conserve vos missions et votre mémoire. Connectez-vous avec votre clé propriétaire.</p>
+  <form id="loginForm">
+   <label for="ownerKey">Clé d'accès propriétaire</label>
+   <input id="ownerKey" type="password" autocomplete="off" required minlength="32">
+   <button class="btn dark" type="submit">Ouvrir Gaïrus</button>
+  </form>
+  <p class="authError" id="loginError" role="alert">${esc(serverError)}</p>
+  <p class="authNote">La clé reste en mémoire dans cet onglet. Elle n'est ni enregistrée dans le navigateur, ni intégrée au code public.</p>
+ </section></main>`;
+ document.querySelector("#loginForm").addEventListener("submit",async event=>{
+  event.preventDefault();
+  accessKey=document.querySelector("#ownerKey").value.trim();
+  try{
+   state.data.status=await api("/status");
+   const history=await api("/conversations");
+   state.messages=arr(history).map(item=>({role:item.role,text:item.content}));
+   authenticated=true;
+   serverError="";
+   render();
+   await loadData();
+  }catch(error){
+   accessKey="";
+   document.querySelector("#loginError").textContent=error.message;
+  }
+ });
 }
 
 function renderChat(){
@@ -185,7 +247,6 @@ async function sendChat(){
  if(welcome)welcome.remove();
 
  state.messages.push({role:"user",text});
- localStorage.setItem("gairus_chat",JSON.stringify(state.messages));
 
  box.insertAdjacentHTML("beforeend",messageHTML({role:"user",text}));
  box.insertAdjacentHTML("beforeend",`<div class="msg" id="working"><div class="avatar">G</div><div class="bubble">Gaïrus travaille…</div></div>`);
@@ -206,13 +267,11 @@ async function sendChat(){
 
   state.messages.push({role:"assistant",text:reply});
   state.messages=state.messages.slice(-100);
-  localStorage.setItem("gairus_chat",JSON.stringify(state.messages));
  }catch(e){
   const working=document.querySelector("#working");
   const reply="Erreur : "+e.message;
   if(working)working.outerHTML=messageHTML({role:"assistant",text:reply});
   state.messages.push({role:"assistant",text:reply});
-  localStorage.setItem("gairus_chat",JSON.stringify(state.messages));
  }finally{
   btn.disabled=false;
   input.focus();
@@ -220,7 +279,10 @@ async function sendChat(){
  }
 }
 
-function updateChatStatus(){}
+function updateChatStatus(){
+ const label=document.querySelector(".online");
+ if(label)label.innerHTML=`<i></i> ${state.data.status.status==="online"?"Serveur connecté":"Connexion indisponible"}`;
+}
 
 function missions(){
  const a=state.data.missions;
@@ -307,14 +369,14 @@ function health(){
  return head("Système","État du backend")+
  `<div class="grid">
   <div class="card"><div class="badge ok">Connecté</div><h3>Backend</h3><p>Gaïrus répond aux requêtes.</p></div>
-  <div class="card"><div class="badge ok">Actif</div><h3>Moteur IA</h3><p>${esc(s.provider||s.brain||"automatique")}</p></div>
+  <div class="card"><div class="badge ${s.providers_configured?"ok":"wait"}">${s.providers_configured?"Configuré":"À configurer"}</div><h3>Moteur IA</h3><p>${esc(s.provider||"Aucun fournisseur IA configuré. Une clé serveur est nécessaire.")}</p></div>
   <div class="card"><div class="badge ok">${state.data.missions.length}</div><h3>Missions</h3><p>Enregistrées.</p></div>
  </div>`;
 }
 
 function settings(){
  return head("Paramètres","Configuration serveur")+
- `<div class="card"><h3>Gaïrus</h3><p>Les clés API, les fournisseurs et les paramètres sensibles restent sur le serveur Render.</p></div>`;
+ `<div class="card"><h3>Gaïrus</h3><p>Les clés API, les fournisseurs et les paramètres sensibles restent sur le serveur cloud.</p><button class="btn" data-action="logout">Se déconnecter</button></div>`;
 }
 
 function head(h,s){
@@ -344,6 +406,10 @@ async function createMission(){
    method:"POST",
    body:JSON.stringify({title:title||objective,objective})
   });
+  for(const id of ["missionTitle","missionObjective"]){
+   const field=document.getElementById(id);
+   if(field)field.value="";
+  }
   await loadData();
   state.page="missions";
   location.hash="missions";
@@ -376,6 +442,7 @@ async function saveMemory(){
 
  try{
   await api("/memory",{method:"POST",body:JSON.stringify({content,memory:content})});
+  el.value="";
   await loadData();
   render();
  }catch(e){alert(e.message)}
@@ -410,6 +477,12 @@ document.addEventListener("click",async e=>{
  if(!action)return;
 
  switch(action.dataset.action){
+  case"logout":
+   accessKey="";
+   authenticated=false;
+   state.messages=[];
+   render();
+   break;
   case"menu":
    document.querySelector("#side")?.classList.toggle("open");
    break;

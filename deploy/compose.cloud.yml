@@ -1,0 +1,43 @@
+services:
+  gairus:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ../.env
+    environment:
+      PORT: "8000"
+      GAIRUS_DATA_DIR: /app/data
+      GAIRUS_DB: /app/data/gairus.db
+      GAIRUS_SLACK_MEMORY_DB: /app/data/slack_memory.db
+    volumes:
+      - gairus_data:/app/data
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      GAIRUS_DOMAIN: ${GAIRUS_DOMAIN:-gairus.zyrvion.io}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - gairus
+volumes:
+  gairus_data:
+  caddy_data:
+  caddy_config:

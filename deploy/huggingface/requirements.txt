@@ -1,0 +1,11 @@
+gradio[oauth]==6.30.0
+spaces==0.51.3
+torch==2.13.0
+transformers==5.20.2
+accelerate>=1.10,<2
+huggingface-hub==1.33.0
+requests>=2.32.4,<3
+kokoro-onnx==0.4.9
+onnxruntime==1.31.1
+soundfile>=0.13,<1
+Pillow>=11.3,<13

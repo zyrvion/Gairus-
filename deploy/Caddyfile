@@ -1,0 +1,7 @@
+{
+    email {$ACME_EMAIL}
+}
+{$GAIRUS_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy gairus:8000
+}

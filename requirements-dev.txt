@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8.4,<10
+PyYAML>=6.0.2,<7
+huggingface-hub==1.33.0

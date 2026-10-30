@@ -647,6 +647,11 @@ check();
 
 
 def write_files():
+    raise RuntimeError(
+        "Générateur historique désactivé : il écraserait les corrections et "
+        "recréerait une configuration Render annulée. "
+        "Utilise le code existant et docs/FREE_CLOUD.md."
+    )
     for name, content in FILES.items():
         path = ROOT / name
         path.parent.mkdir(parents=True, exist_ok=True)

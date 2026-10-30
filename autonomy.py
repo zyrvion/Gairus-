@@ -15,6 +15,10 @@ from self_code_tools import REGISTRY as SELF_CODE_REGISTRY
 from datetime import datetime, timezone
 
 DB_PATH = os.getenv("GAIRUS_DB", "data/gairus.db")
+APPROVAL_REQUIRED_TOOLS = {
+    "http_get", "write_code", "git_commit", "write_file", "delete_file",
+    "shell", "terminal", "bank_transfer", "legal_signature", "slack_send",
+}
 
 _ENGINE_LOCK = threading.Lock()
 _MISSION_RUNTIME_LOCK = threading.RLock()
@@ -224,6 +228,8 @@ def create_action(
     parameters=None,
     requires_approval=False,
 ):
+    # The model or API caller cannot opt out of sensitive-tool approvals.
+    requires_approval = bool(requires_approval) or tool in APPROVAL_REQUIRED_TOOLS
     action_id = str(uuid.uuid4())
     timestamp = now()
 
@@ -1152,11 +1158,6 @@ améliorer, corriger ou faire évoluer son propre code :
 """
 
 
-APPROVAL_REQUIRED_TOOLS = {
-    "http_get",
-}
-
-
 def execute_registered_tool(tool, parameters=None):
     tool = str(tool or "none").strip()
 
@@ -1870,7 +1871,12 @@ def _autonomous_mission_cycle_locked(mission_id):
 
                 kind, fn = registry[tool_name]
 
-                value = fn(**(parameters or {}))
+                if kind == "native" and tool_name not in SELF_CODE_REGISTRY:
+                    value = fn(parameters or {})
+                else:
+                    value = fn(**(parameters or {}))
+                if isinstance(value, dict) and value.get("ok") is False:
+                    raise RuntimeError(value.get("error") or f"Échec de {tool_name}")
 
                 with db() as conn:
                     conn.execute(
@@ -2039,4 +2045,3 @@ RÈGLE ABSOLUE DE VÉRACITÉ POUR ZYRVION :
             "ok": False,
             "error": str(exc),
         }
-

@@ -15,10 +15,11 @@ services:
       PORT: "10000"
       GAIRUS_NAME: "Gaïrus"
       GAIRUS_PROJECT: "ZYRVION"
-      GAIRUS_AUTONOMY: "true"
+      GAIRUS_AUTONOMY: "${GAIRUS_AUTONOMY:-false}"
       GAIRUS_APPROVALS: "true"
       GAIRUS_LLM_PROVIDER: "auto"
       GAIRUS_LLM_MODEL: "auto"
+      GAIRUS_SLACK_MEMORY_DB: "/app/data/slack_memory.db"
 
     ports:
       - "10000:10000"

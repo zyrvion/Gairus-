@@ -1,4 +1,3 @@
-cd ~/gairus && cat > autonomous_runtime.py <<'PY'
 from __future__ import annotations
 
 import json
@@ -779,4 +778,14 @@ def main(argv=None):
     )
 
     if not argv:
+        print("Usage: autonomous_runtime_v2.py [health|run OBJECTIVE]")
+        return 0
+    if argv[0] == "health":
+        print(dump(health()))
+        return 0
+    if argv[0] == "run" and len(argv) > 1:
+        print(dump(run(" ".join(argv[1:]))))
+        return 0
+    print("Commande inconnue ou objectif manquant.")
+    return 1
      
