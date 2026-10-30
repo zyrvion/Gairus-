@@ -40,6 +40,21 @@ SYSTEM = (
 def fail(exc):
     if isinstance(exc, StoreError):
         raise gr.Error(str(exc)) from None
+    if isinstance(exc, gr.Error):
+        # ZeroGPU reports availability through Gradio errors. Classify locally,
+        # but never expose the original upstream message or a paid-upgrade link.
+        if "quota" in str(exc).casefold():
+            log.warning("Cloud operation failed: free_gpu_quota")
+            raise gr.Error(
+                "Le quota gratuit de calcul GPU est atteint. Connecte-toi "
+                "avec Hugging Face ou réessaie après son renouvellement. "
+                "Aucun service payant n'est appelé."
+            ) from None
+        log.warning("Cloud operation failed: free_gpu_unavailable")
+        raise gr.Error(
+            "Le calcul GPU gratuit est momentanément indisponible. Réessaie "
+            "plus tard ; aucun service payant n'est appelé."
+        ) from None
     # Never log token-bearing request objects or upstream exception text.
     log.warning("Cloud operation failed: %s", type(exc).__name__)
     raise gr.Error(

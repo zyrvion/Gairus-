@@ -204,3 +204,37 @@ def test_no_paid_inference_fallback_or_arbitrary_model_code():
     assert "@GPU(duration=45)" in inference
     assert "api.openai.com" not in inference
     assert "router.huggingface.co" not in inference
+
+
+@pytest.mark.parametrize("case,expected", [
+    ("validation", "Validation locale refusée"),
+    ("quota", "Le quota gratuit de calcul GPU est atteint"),
+    ("gpu", "Le calcul GPU gratuit est momentanément indisponible"),
+    ("unknown", "Le service n'a pas pu terminer cette opération"),
+])
+def test_error_handler_classifies_without_leaking_upstream_text(case, expected):
+    import ast
+
+    class GradioError(Exception):
+        pass
+
+    messages = []
+    namespace = {
+        "gr": SimpleNamespace(Error=GradioError),
+        "StoreError": state.StoreError,
+        "log": SimpleNamespace(warning=lambda *args: messages.append(args)),
+    }
+    tree = ast.parse((SOURCE / "app.py").read_text())
+    handler = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "fail")
+    module = ast.Module(body=[handler], type_ignores=[])
+    exec(compile(module, "isolated-error-handler", "exec"), namespace)
+    errors = {
+        "validation": state.StoreError("Validation locale refusée"),
+        "quota": GradioError("GPU quota exceeded: upstream-sensitive-text"),
+        "gpu": GradioError("upstream-sensitive-text"),
+        "unknown": RuntimeError("upstream-sensitive-text"),
+    }
+    with pytest.raises(GradioError, match=expected) as caught:
+        namespace["fail"](errors[case])
+    assert "upstream-sensitive-text" not in str(caught.value)
+    assert "upstream-sensitive-text" not in repr(messages)
