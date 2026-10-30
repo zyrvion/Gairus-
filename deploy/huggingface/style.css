@@ -34,6 +34,14 @@ input, textarea { font-size: var(--text-base) !important; }
 #owner-login { width: 100%; min-width: 0; align-self: center; }
 #connection { font-size: var(--text-sm); padding-bottom: var(--space-3); }
 #workspace { padding-block: var(--space-2); }
+.gradio-container button.primary { background: var(--gairus-accent) !important; border-color: var(--gairus-accent) !important; color: #fff !important; }
+.gradio-container button.primary:hover { background: #184982 !important; }
+.gradio-container [role="tab"][aria-selected="true"], .gradio-container .prose a { color: #215bac !important; }
+.gradio-container input::placeholder, .gradio-container textarea::placeholder { color: #596579 !important; opacity: 1; }
+.dark .gradio-container [role="tab"][aria-selected="true"], .dark .gradio-container .prose a { color: #b5d2ff !important; }
+.dark .gradio-container input::placeholder, .dark .gradio-container textarea::placeholder { color: #b5c0d1 !important; }
+#agent-results a { color: #215bac; text-decoration: underline; display: inline-block; padding-block: var(--space-1); }
+.dark #agent-results a { color: #b5d2ff; }
 #workspace .tab-nav button { min-height: 44px; padding-inline: var(--space-4); font-size: var(--text-sm); }
 #chat-history { margin-bottom: var(--space-2); }
 #chat-status, #privacy-note { font-size: var(--text-xs); }

@@ -11,16 +11,41 @@ hf_oauth_scopes:
   - write-repos
 models:
   - Qwen/Qwen3-4B-Instruct-2507
-short_description: Assistant privé, conversations, plans de mission et mémoire
+  - onnx-community/Kokoro-82M-v1.0-ONNX
+short_description: "Agent privé : documents, voix FR et présentations vidéo"
 ---
 
 # Gaïrus
 
-Version cloud personnelle à budget nul : conversation IA, rédaction, code,
-plans de mission et mémoire. L'accès aux données est réservé au propriétaire
+Version cloud personnelle à budget nul : agent borné produisant de vrais
+documents Markdown, voix françaises WAV et présentations vidéo MP4.
+Conversation IA, plans de mission et mémoire restent disponibles séparément.
+L'accès aux données est réservé au propriétaire
 du Space connecté avec Hugging Face. Les conversations et mémoires sont
 enregistrées dans son dépôt de données privé, pas sur le disque temporaire
 du Space et pas dans le navigateur.
+
+## Outils exécutables
+
+L'onglet Agent transforme l'objectif en un plan JSON strictement validé,
+exécute uniquement les outils locaux autorisés et vérifie les fichiers
+avant de déclarer le travail terminé. Aucun texte du modèle ne peut
+ajouter un outil, exécuter une commande arbitraire ou autoriser un paiement.
+Les fichiers et leur manifeste SHA-256 sont sauvegardés avec l'état en une
+écriture versionnée. Les téléchargements sont fournis dans la réponse privée
+authentifiée, jamais dans le cache de fichiers public de Gradio.
+Les médias sont stockés comme texte base64 borné dans des fichiers `.b64`
+privés, puis décodés et vérifiés avant de restituer les vrais WAV/MP4.
+
+La voix française standard `ff_siwis` utilise
+[Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) sur CPU et les
+[poids ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX)
+à la révision `1939ad2a8e416c0acfeecc08a694d14ef25f2231`.
+Elle n'appelle pas ElevenLabs et ne clone pas une personne.
+Le moteur vidéo assemble une à trois diapositives et la narration avec
+FFmpeg. **Ce n'est pas un moteur de scènes animées générées par IA.**
+Limites : narration de 1200 caractères, vidéo de 100 secondes au maximum,
+6 Mo par fichier et 50 travaux sauvegardés sans effacement automatique.
 
 ## Fonctionnement
 
@@ -55,10 +80,14 @@ Un échec de sauvegarde n'est jamais présenté comme une sauvegarde réussie.
 ## Limites de cette version
 
 Les plans générés sont des propositions, pas des actions exécutées.
-Aucun message externe, achat, commande système, changement GitHub ou DNS
-n'est exécuté par le modèle. La navigation web et les intégrations externes
+Aucun message externe, achat, commande arbitraire, changement GitHub ou DNS
+n'est exécuté par le modèle. Seul l'encodage FFmpeg à arguments fixes est
+autorisé dans l'outil vidéo. La navigation web et les intégrations externes
 du runtime complet ne sont pas activées dans cette version gratuite.
 Ce n'est pas une copie complète de VIKTOR.
+Slack n'est pas connecté : il manque l'application et ses autorisations.
+L'API `/service_agent` est privée par clé, sans mémoire ; elle ne constitue
+pas à elle seule une intégration Slack.
 
 Le sous-domaine `gairus.zyrvion.io`, la migration des projets VIKTOR et
 l'app terrain restent des opérations distinctes. Le site Zyrvion existant

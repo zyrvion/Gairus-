@@ -39,3 +39,20 @@ No GitHub write credentials, hosting authorization or DNS access were available
 at baseline. Local commits are not upstream changes. A Computer preview is not a
 permanent deployment. VIKTOR's private account has not been accessed or exported.
 No production DNS changes, paid services, data deletion or autonomous sends.
+
+## Executable agent and free media checks, 2026-10-30
+
+- Keep sign-in, conversations, manual missions, memory, owner checks and logout.
+- Add an Agent tab that converts an objective to a bounded executable job.
+- The job actually writes Markdown, synthesizes French WAV with Kokoro, and
+  renders a narrated MP4 presentation when requested. It is not neural scene
+  generation, a voice-cloning service, or a full VIKTOR replacement.
+- Validate plans before invoking tools; reject unsupported actions and all
+  paid providers. No fallback to a paid endpoint on quota exhaustion.
+- Show journal entries only after verified tool output exists.
+- Persist finished executions and their real files atomically in private
+  storage; previous conversations and unknown state fields remain intact.
+- Downloads and audio/video previews use authenticated callback data, never
+  public Gradio file URLs. Saved results can be reopened after a restart.
+- Exercise real French TTS and FFmpeg output, then browser UI desktop/375px.
+- Slack remains unavailable until an authorized Slack application is connected.

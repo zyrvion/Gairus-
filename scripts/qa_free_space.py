@@ -1,6 +1,7 @@
 """LOCAL QA ONLY. Not shipped to the Space. Synthetic inference, real Hub I/O."""
 
 import importlib.util
+import json
 from pathlib import Path
 import sys
 
@@ -21,11 +22,25 @@ gradio.oauth.whoami = lambda: requests.get(
 spec = importlib.util.spec_from_file_location("gairus_free_qa", SOURCE / "app.py")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
-module.inference.generate = lambda messages: (
-    "Validation synthétique du parcours navigateur uniquement.\n\n"
-    "1. Préparer les informations.\n2. Vérifier les contraintes.\n"
-    "3. Faire valider le résultat.\n\nAucune action externe n'est exécutée."
-)
+def synthetic_generate(messages):
+    if messages[0]["content"] == module.free_agent.PLANNER:
+        requested = messages[-1]["content"].splitlines()[0].split(": ", 1)[1]
+        kind = "presentation" if requested == "auto" else requested
+        return json.dumps({
+            "kind": kind, "title": "QA-20261030 : résultat synthétique",
+            "content": "Validation du parcours de Gaïrus. Le plan est synthétique, "
+                       "mais la voix et la vidéo sont réellement produites par les outils.",
+            "slides": ["Plan synthétique de validation.", "Voix et vidéo réellement produites."]
+                      if kind == "presentation" else [],
+        })
+    return (
+        "Validation synthétique du parcours navigateur uniquement.\n\n"
+        "1. Préparer les informations.\n2. Vérifier les contraintes.\n"
+        "3. Faire valider le résultat.\n\nAucune action externe n'est exécutée."
+    )
+
+
+module.inference.generate = synthetic_generate
 demo = module.build_demo()
 application = gr.mount_gradio_app(
     FastAPI(), demo, path="/", server_name="127.0.0.1", server_port=8792,

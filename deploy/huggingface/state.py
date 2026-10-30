@@ -148,9 +148,19 @@ class HubState:
         state, _ = self._read(self._client(token), token)
         return state
 
-    def update(self, token, mutate, message="Gaïrus: mise à jour privée"):
+    def update(self, token, mutate, message="Gaïrus: mise à jour privée", artifact_files=()):
         from huggingface_hub import CommitOperationAdd
 
+        artifacts = []
+        for path, content in artifact_files:
+            if (
+                not re.fullmatch(r"artifacts/[0-9a-f]{32}/(document\.md|narration\.wav\.b64|presentation\.mp4\.b64)", path)
+                or not isinstance(content, bytes) or not 1 <= len(content) <= 8_000_000
+            ):
+                raise StoreError("Le fichier de résultat n'est pas autorisé.")
+            artifacts.append(CommitOperationAdd(path_in_repo=path, path_or_fileobj=content))
+        if len(artifacts) > 3:
+            raise StoreError("Un travail ne peut produire que trois fichiers.")
         api = self._client(token)
         for attempt in range(3):
             state, revision = self._read(api, token)
@@ -164,7 +174,7 @@ class HubState:
                 api.create_commit(
                     repo_id=self.repo_id,
                     repo_type="dataset",
-                    operations=[CommitOperationAdd(path_in_repo="state.json", path_or_fileobj=payload)],
+                    operations=[CommitOperationAdd(path_in_repo="state.json", path_or_fileobj=payload), *artifacts],
                     commit_message=message,
                     parent_commit=revision,
                 )

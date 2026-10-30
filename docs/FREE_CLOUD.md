@@ -50,11 +50,18 @@ jamais être remplacé silencieusement par une base vide.
 
 ## Fonctions et limites
 
+- Agent borné : objectif, plan JSON validé, exécution d'outils gratuits, preuves
+  et fichiers réels. Document Markdown, voix française Kokoro sur CPU et MP4
+  de diapositives narrées avec FFmpeg, pas de scènes vidéo générées par IA.
+- Travaux et fichiers sauvegardés atomiquement dans le dataset privé ; lecture
+  ultérieure vérifie SHA-256, taille et type. Aucun cache public Gradio.
 - Conversation réelle avec Qwen3-4B, rédaction, analyse de texte et code.
 - Conversations distinctes, mémoire et plans de mission sauvegardés.
 - Statuts de suivi explicitement manuels, sans exécution externe implicite.
 - API de conversation sans mémoire pour les futures intégrations, protégée
   par une clé de service aléatoire d'au moins quarante caractères.
+- API `/service_agent` protégée par la même clé, sans sauvegarde implicite.
+  Slack n'est pas raccordé et aucune livraison de fichiers Slack n'est annoncée.
 - Pas de navigateur autonome, d'exécution de code, d'envoi externe ou d'achat.
 - Le runtime Flask complet reste disponible dans le dépôt, mais n'est pas
   prétendu intégralement activé dans ce mode gratuit.

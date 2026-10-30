@@ -19,6 +19,7 @@ DATASET = "NostraEmpire/gairus-private-state"
 FILES = (
     "README.md", "requirements.txt", "state.py", "inference.py",
     "private_sessions.py", "app.py", "style.css",
+    "free_agent.py", "media_tools.py", "agent_store.py", "packages.txt",
 )
 
 
