@@ -35,6 +35,8 @@ def main():
     identity = response.json()
     if identity.get("name") != "NostraEmpire":
         raise SystemExit("Wrong account; no deployment performed.")
+    if identity.get("isPro") is not False or identity.get("canPay") is not False:
+        raise SystemExit("Free-only account billing guard could not be confirmed; refusing deployment.")
     runtime = api.get_space_runtime(SPACE)
     for hardware in (runtime.hardware, runtime.requested_hardware):
         if hardware is not None and hardware != "zero-a10g":
